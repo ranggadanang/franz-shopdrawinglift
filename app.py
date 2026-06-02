@@ -10,7 +10,7 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
 # Set Konfigurasi Halaman Web Streamlit
-st.set_page_config(page_title="Franz Lift Drawing Generator", layout="wide", page_icon="⚙️")
+st.set_page_config(page_title="Franz Lift Structure Drawing", layout="wide", page_icon="⚙️")
 
 # =========================================================================
 # G1. CONFIG: INITIALIZATION GOOGLE SHEETS & RECALL SESSION STATE SYSTEM
@@ -617,14 +617,14 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
 # ==========================================
 # 4. EXECUTOR CONTROLLER (STREAMLIT INTERFACE WEB)
 # ==========================================
-st.title("Franz Lift Shop Drawing Generator")
-st.markdown("Aplikasi Otomatisasi Gambar Kerja Sipil Penempatan Separator Beam & Kolom Struktur Utama Lift by RDP.")
+st.title("Franz Lift Structure Drawing")
+st.markdown("Aplikasi Otomatis Gambar Kerja Sipil Penempatan Separator Beam & Kolom Struktur Utama Lift by RDP.")
 st.write("---")
 
 tab_balok, tab_kolom = st.tabs(["1. Opsi Balok Separator Beam", "2. Opsi Tiang Kolom Struktur"])
 
 with tab_balok:
-    st.header("Konfigurasi Gambar Kerja Balok Separator Samping")
+    st.header("Konfigurasi Gambar Kerja Balok Separator")
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -642,7 +642,7 @@ with tab_balok:
         b_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=st.session_state.b_h_headroom)
 
     with col3:
-        st.subheader("Dimensi Gawang & Penempatan")
+        st.subheader("Dimensi Opening & Ketinggian")
         b_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=st.session_state.b_jml_lantai)
         b_travel_list = []
         for i in range(1, b_jml_lantai):
@@ -652,9 +652,9 @@ with tab_balok:
         b_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=st.session_state.b_lebar_p)
         b_width_doorway = st.number_input("Lebar Kongleong Opening Sipil (mm):", value=st.session_state.b_width_doorway)
         b_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=st.session_state.b_tinggi_p)
-        b_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang (mm):", value=st.session_state.b_tinggi_gembosan)
-        b_tebal_l = st.number_input("Tebal Balok Cor Gawang Pintu (mm):", value=st.session_state.b_tebal_l)
-        b_dinding_kiri = st.number_input("Jarak Dinding Kiri ke Tepi Doorway (mm):", value=st.session_state.b_dinding_kiri)
+        b_tinggi_gembosan = st.number_input("Total Tinggi Opening Pintu Sipil (mm):", value=st.session_state.b_tinggi_gembosan)
+        b_tebal_l = st.number_input("Tebal Balok Cor Opening Pintu (mm):", value=st.session_state.b_tebal_l)
+        b_dinding_kiri = st.number_input("Jarak Dinding Kiri Kupingan Opening Pintu (mm):", value=st.session_state.b_dinding_kiri)
         b_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Balok):", ["KANAN", "KIRI"], index=["KANAN", "KIRI"].index(st.session_state.b_side_tombol), horizontal=True)
 
     st.write("---")
@@ -721,7 +721,7 @@ with tab_kolom:
         k_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm): ", value=st.session_state.k_lebar_p)
         k_width_doorway = st.number_input("Lebar Kongleong Sipil Opening (mm): ", value=st.session_state.k_width_doorway)
         k_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm): ", value=st.session_state.k_tinggi_p)
-        k_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang Pintu (mm): ", value=st.session_state.k_tinggi_gembosan)
+        k_tinggi_gembosan = st.number_input("Total Tinggi Opening Pintu Sipil (mm): ", value=st.session_state.k_tinggi_gembosan)
         k_tebal_l = st.number_input("Tebal Balok Cor Lintel di atas pintu (mm): ", value=st.session_state.k_tebal_l)
         k_dinding_kiri = st.number_input("Jarak asimetris dinding kiri KUPINGAN OPENING (mm): ", value=st.session_state.k_dinding_kiri)
         k_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Kolom): ", ["KANAN", "KIRI"], index=["KANAN", "KIRI"].index(st.session_state.k_side_tombol), horizontal=True)
