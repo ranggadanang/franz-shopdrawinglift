@@ -312,8 +312,6 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         ax2.add_patch(plt.Rectangle((0, -100), lebar_sh, 100, hatch='...', facecolor='lightgray', edgecolor='black', alpha=0.6))
         ax2.plot([0, 0], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
         ax2.plot([lebar_sh, lebar_sh], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
-        
-        # FIX PERBAIKAN: Mengganti variabel typo agar tidak menghasilkan tuple data bentrok
         ax2.plot([dinding_kiri, dinding_kiri], [0, elevasi_lintel], 'k-', lw=2)
         ax2.plot([lebar_sh - dinding_kanan, lebar_sh - dinding_kanan], [0, elevasi_lintel], 'k-', lw=2)
         ax2.plot([dinding_kiri, lebar_sh - dinding_kanan], [elevasi_lintel, elevasi_lintel], 'k-', lw=2)
@@ -331,7 +329,9 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
             
         ax2.plot([x_hole - 50, x_hole + 50], [1200, 1200], 'r-', lw=1)
         ax2.plot(x_hole, 1200, 'ko', markersize=10, fillstyle='none', lw=1.5)
-        ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=(xy_text_pos, 1000),
+        
+        # PERBAIKAN MUTLAK: Mengubah kurung bersarang (xy_text_pos, 1000) menjadi xy_text_pos agar terbaca tuple tunggal numerik murni
+        ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=xy_text_pos,
                      arrowprops=dict(arrowstyle="->", color="black", lw=1.2, connectionstyle=f"arc3,rad={rad_val}"),
                      fontsize=9, color='black', fontweight='bold', ha='center', va='top')
 
@@ -385,7 +385,6 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         ax3.plot([0, lebar_sh], [y_dim_width, y_dim_width], 'r-', lw=1.2)
         ax3.plot([0, 0], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
         
-        # PERBAIKAN MUTLAK: Menjamin y_dim_width dibaca sebagai basis dimensi horizontal bersih tunggal
         ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
         ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
         
@@ -505,7 +504,7 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
         ax2.plot([x_hole - 50, x_hole + 50], [1200, 1200], 'r-', lw=1)
         ax2.plot(x_hole, 1200, 'ko', markersize=10, fillstyle='none', lw=1.5)
         
-        ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=(xy_text_pos, 1000),
+        ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=xy_text_pos,
                      arrowprops=dict(arrowstyle="->", color="black", lw=1.2, connectionstyle=f"arc3,rad={rad_val}"),
                      fontsize=9, color='black', fontweight='bold', ha='center', va='top')
         
