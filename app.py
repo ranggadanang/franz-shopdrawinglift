@@ -312,8 +312,6 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         ax2.add_patch(plt.Rectangle((0, -100), lebar_sh, 100, hatch='...', facecolor='lightgray', edgecolor='black', alpha=0.6))
         ax2.plot([0, 0], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
         ax2.plot([lebar_sh, lebar_sh], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
-        
-        # PERBAIKAN DRUM TUPLE KAKU: Mengganti deklarasi inline ganda walrus tuple operator menjadi int bersih reguler
         ax2.plot([dinding_kiri, dinding_kiri], [0, elevasi_lintel], 'k-', lw=2)
         ax2.plot([lebar_sh - dinding_kanan, lebar_sh - dinding_kanan], [0, elevasi_lintel], 'k-', lw=2)
         ax2.plot([dinding_kiri, lebar_sh - dinding_kanan], [elevasi_lintel, elevasi_lintel], 'k-', lw=2)
@@ -384,7 +382,9 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         y_dim_width = dalam_sh + w_sep + 320
         ax3.plot([0, lebar_sh], [y_dim_width, y_dim_width], 'r-', lw=1.2)
         ax3.plot([0, 0], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
-        ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_w_line + 40] if 'y_w_line' in locals() else [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
+        
+        # PERBAIKAN TOTAL: Menghapus logika evaluasi sisa variabel y_w_line agar murni membaca garis dimensi horizontal y_dim_width
+        ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
         ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
         
         x_dim_depth = lebar_sh + w_sep + 320
@@ -569,7 +569,7 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
             ax3.text(x_r1 - 35, y_end_cwt_belakang + (sisa_belakang_cwt/2), f"{int(sisa_belakang_cwt)} mm\n(Sisa Belakang)", color='red', va='center', ha='right', fontweight='bold', fontsize=9.5)
             
             ax3.text(x_l2 - 45, dalam_sh / 2, f"Clear Depth: {dalam_sh} mm", color='darkred', va='center', ha='right', fontweight='bold', fontsize=10)
-            ax3.text(x_r2 + 45, dans_sh / 2 if 'dans_sh' in locals() else dalam_sh / 2, f"Clear Depth:\n{dalam_sh} mm", color='darkred', va='center', ha='left', fontweight='bold', fontsize=10)
+            ax3.text(x_r2 + 45, dalam_sh / 2, f"Clear Depth:\n{dalam_sh} mm", color='darkred', va='center', ha='left', fontweight='bold', fontsize=10)
         else:
             ax3.add_patch(plt.Rectangle((-tebal_kolom, y_start_cwt_depan), tebal_kolom, tebal_kolom, facecolor='black', edgecolor='black'))
             ax3.add_patch(plt.Rectangle((-tebal_kolom, y_start_cwt_belakang), tebal_kolom, tebal_kolom, facecolor='black', edgecolor='black'))
@@ -599,10 +599,9 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
 
 
         y_w_line = dalam_sh + 320
-        if 'y_w_line' in locals():
-            ax3.plot([0, lebar_sh], [y_w_line, y_w_line], 'r-', lw=1.2)
-            ax3.plot([0, 0], [dalam_sh, y_w_line + 40], 'r-', lw=0.6)
-            ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_w_line + 40], 'r-', lw=0.6)
+        ax3.plot([0, lebar_sh], [y_w_line, y_w_line], 'r-', lw=1.2)
+        ax3.plot([0, 0], [dalam_sh, y_w_line + 40], 'r-', lw=0.6)
+        ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_w_line + 40], 'r-', lw=0.6)
         ax3.text(lebar_sh / 2, dalam_sh + 370, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
 
         txt_title = "DENAH POTONGAN STRUKTUR KOLOM UTAMA (TAMPAK ATAS)"
@@ -743,7 +742,7 @@ with tab_kolom:
         payload_b = {
             "nama_project": k_nama_project, "no_drawing": k_no_kontrak, "tipe_modul": "Column Structure",
             "lebar_hoistway": k_lebar_sh, "dalam_hoistway": k_dalam_sh, "kedalaman_pit": k_h_pit, "tinggi_headroom": k_h_headroom,
-            "jml_lantai": k_f_num, "lebar_pintu_bersih": k_lebar_p, "width_doorway": k_width_doorway,
+            "jml_lantai": k_jml_lantai, "lebar_pintu_bersih": k_lebar_p, "width_doorway": k_width_doorway,
             "tinggi_p": k_tinggi_p, "tinggi_gembosan": k_tinggi_gembosan, "tebal_l": k_tebal_l, "dinding_kiri": k_dinding_kiri,
             "side_tombol": k_side_tombol, "posisi_cwt_raw": k_posisi_cwt, "posisi_rel_kabin": k_posisi_rel_kabin,
             "track_gauge_cwt": k_track_gauge_cwt, "tebal_rail_cwt": k_tebal_rail_cwt, "tebal_pintu_luar": k_tebal_pintu_luar,
