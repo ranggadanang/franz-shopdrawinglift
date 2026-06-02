@@ -1,5 +1,5 @@
 import streamlit as st
-import matplotlib.subplots as plt
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.image as mpimg
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -384,7 +384,7 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         ax3.plot([0, 0], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
         
         ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
-        ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
+        ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
         
         x_dim_depth = lebar_sh + w_sep + 320
         ax3.plot([x_dim_depth, x_dim_depth], [0, dalam_sh], 'r-', lw=1.2)
@@ -519,7 +519,7 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
         ax2.text(x_dim_baseline + 90, elevasi_lintel / 2, f"{elevasi_lintel} mm", color='red', va='center', ha='left', fontsize=10, fontweight='bold')
         ax2.text(x_dim_baseline + 90, elevasi_lintel + (tebal_l / 2), f"{tebal_l} mm Lintel", color='red', va='center', ha='left', fontsize=10, fontweight='bold')
         
-        draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 150, y_p2_max - 30, nama_project, no_kontrak, "OPENING PINTU", 2, 3, zoom_logo=0.25)
+        draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 150, y_p2_max - 30, nama_project, no_kontrak, "DENAH POTONGAN STRUKTUR KOLOM UTAMA (TAMPAK ATAS)" if 'txt_title' in locals() else "OPENING PINTU", 2, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig2, dpi=300); plt.close(fig2)
 
         # HALAMAN 3
@@ -729,7 +729,7 @@ with tab_kolom:
         k_lebar_p, k_width_doorway, k_tinggi_p, k_tinggi_gembosan, k_tebal_l, k_dinding_kiri, k_nama_project, k_no_kontrak, cwt_char, k_side_tombol
     )
     
-    st.success(f"Gambar Kerja Resmi Tiang Kolom Struktur Untuk {k_nama_project} Berhasil Di-kalkulasi.")
+    st.success(f"Gambar Kerja Resmi Tiang Kolom Struktur Untuk {k_nama_project} Berhasil Di-kalan-kiri.")
     st.download_button(
         label="💾 Unduh Gambar Kerja Resmi Kolom Struktur (PDF)",
         data=kolom_pdf_data,
