@@ -54,64 +54,67 @@ for k in state_keys:
         elif "tebal_kolom" in k: st.session_state[k] = 200
 
 # =========================================================================
-# G2. SIDEBAR LOGIC: RECALL PROYEK DROPDOWN (READ)
+# G2. SIDEBAR LOGIC: CALLBACK FUNCTION UNTUK AUTO-FILL INSTAN SINKRON
 # =========================================================================
 if os.path.exists("logo.png"):
     st.sidebar.image("logo.png", width=200)
 st.sidebar.markdown("### 📋 Panggil Riwayat Proyek")
 
+def trigger_recall_sync():
+    # Fungsi pemicu kaku untuk menghancurkan cache widget lama dan menimpanya dengan data sheets
+    if st.session_state.pilihan_proyek_sidebar != "-- Pilih Data Untuk Auto-Fill --":
+        # Cari baris data yang cocok
+        row_terpilih = df_history[df_history['label_select'] == st.session_state.pilihan_proyek_sidebar].iloc[0]
+        tipe_modul = row_terpilih['tipe_modul']
+        
+        if tipe_modul == "Separator Beam":
+            st.session_state.b_nama_project = str(row_terpilih.get('nama_project', 'GUNAWAN-JKT'))
+            st.session_state.b_no_kontrak = str(row_terpilih.get('no_drawing', ' '))
+            st.session_state.b_lebar_sh = int(row_terpilih.get('lebar_hoistway', 1700))
+            st.session_state.b_dalam_sh = int(row_terpilih.get('dalam_hoistway', 1500))
+            st.session_state.b_h_pit = int(row_terpilih.get('kedalaman_pit', 170))
+            st.session_state.b_h_headroom = int(row_terpilih.get('tinggi_headroom', 3000))
+            st.session_state.b_jml_lantai = int(row_terpilih.get('jml_lantai', 3))
+            st.session_state.b_lebar_p = int(row_terpilih.get('lebar_pintu_bersih', 800))
+            st.session_state.b_width_doorway = int(row_terpilih.get('width_doorway', 950))
+            st.session_state.b_tinggi_p = int(row_terpilih.get('tinggi_p', 2000))
+            st.session_state.b_tinggi_gembosan = int(row_terpilih.get('tinggi_gembosan', 2100))
+            st.session_state.b_tebal_l = int(row_terpilih.get('tebal_l', 300))
+            st.session_state.b_dinding_kiri = int(row_terpilih.get('dinding_kiri', 375))
+            st.session_state.b_side_tombol = str(row_terpilih.get('side_tombol', 'KANAN'))
+            st.session_state.b_config_sep = str(row_terpilih.get('config_sep', '3-SISI'))
+            
+        elif tipe_modul == "Column Structure":
+            st.session_state.k_nama_project = str(row_terpilih.get('nama_project', 'GUNAWAN-JKT'))
+            st.session_state.k_no_kontrak = str(row_terpilih.get('no_drawing', ' '))
+            st.session_state.k_posisi_cwt = str(row_terpilih.get('posisi_cwt_raw', 'L (KANAN LAYOUT)'))
+            st.session_state.k_lebar_sh = int(row_terpilih.get('lebar_hoistway', 1430))
+            st.session_state.k_dalam_sh = int(row_terpilih.get('dalam_hoistway', 1430))
+            st.session_state.k_h_pit = int(row_terpilih.get('kedalaman_pit', 170))
+            st.session_state.k_h_headroom = int(row_terpilih.get('tinggi_headroom', 3000))
+            st.session_state.k_jml_lantai = int(row_terpilih.get('jml_lantai', 3))
+            st.session_state.k_posisi_rel_kabin = int(row_terpilih.get('posisi_rel_kabin', 670))
+            st.session_state.k_track_gauge_cwt = int(row_terpilih.get('track_gauge_cwt', 700))
+            st.session_state.k_tebal_rail_cwt = int(row_terpilih.get('tebal_rail_cwt', 60))
+            st.session_state.k_tebal_pintu_luar = int(row_terpilih.get('tebal_pintu_luar', 110))
+            st.session_state.k_celah_daun_pintu = int(row_terpilih.get('celah_daun_pintu', 30))
+            st.session_state.k_tebal_kolom = int(row_terpilih.get('tebal_kolom', 200))
+            st.session_state.k_lebar_p = int(row_terpilih.get('lebar_pintu_bersih', 800))
+            st.session_state.k_width_doorway = int(row_terpilih.get('width_doorway', 950))
+            st.session_state.k_tinggi_p = int(row_terpilih.get('tinggi_p', 2000))
+            st.session_state.k_tinggi_gembosan = int(row_terpilih.get('tinggi_gembosan', 2100))
+            st.session_state.k_tebal_l = int(row_terpilih.get('tebal_l', 300))
+            st.session_state.k_dinding_kiri = int(row_terpilih.get('dinding_kiri', 400))
+            st.session_state.k_side_tombol = str(row_terpilih.get('side_tombol', 'KANAN'))
+
 try:
-    df_history = conn.read(ttl="5s")
+    df_history = conn.read(ttl="1s")
     if df_history is not None and not df_history.empty:
         df_history['label_select'] = df_history['nama_project'].astype(str) + " (" + df_history['no_drawing'].astype(str) + ") [" + df_history['tipe_modul'].astype(str) + "]"
         options_list = ["-- Pilih Data Untuk Auto-Fill --"] + df_history['label_select'].tolist()
         
-        selected_project = st.sidebar.selectbox("Pilih Proyek:", options_list)
-        
-        if selected_project != "-- Pilih Data Untuk Auto-Fill --":
-            row = df_history[df_history['label_select'] == selected_project].iloc[0]
-            tipe = row['tipe_modul']
-            st.sidebar.success(f"Berhasil memuat tipe: {tipe}")
-            
-            if tipe == "Separator Beam":
-                st.session_state.b_nama_project = str(row.get('nama_project', 'GUNAWAN-JKT'))
-                st.session_state.b_no_kontrak = str(row.get('no_drawing', ' '))
-                st.session_state.b_lebar_sh = int(row.get('lebar_hoistway', 1700))
-                st.session_state.b_dalam_sh = int(row.get('dalam_hoistway', 1500))
-                st.session_state.b_h_pit = int(row.get('kedalaman_pit', 170))
-                st.session_state.b_h_headroom = int(row.get('tinggi_headroom', 3000))
-                st.session_state.b_jml_lantai = int(row.get('jml_lantai', 3))
-                st.session_state.b_lebar_p = int(row.get('lebar_pintu_bersih', 800))
-                st.session_state.b_width_doorway = int(row.get('width_doorway', 950))
-                st.session_state.b_tinggi_p = int(row.get('tinggi_p', 2000))
-                st.session_state.b_tinggi_gembosan = int(row.get('tinggi_gembosan', 2100))
-                st.session_state.b_tebal_l = int(row.get('tebal_l', 300))
-                st.session_state.b_dinding_kiri = int(row.get('dinding_kiri', 375))
-                st.session_state.b_side_tombol = str(row.get('side_tombol', 'KANAN'))
-                st.session_state.b_config_sep = str(row.get('config_sep', '3-SISI'))
-                
-            elif tipe == "Column Structure":
-                st.session_state.k_nama_project = str(row.get('nama_project', 'GUNAWAN-JKT'))
-                st.session_state.k_no_kontrak = str(row.get('no_drawing', ' '))
-                st.session_state.k_posisi_cwt = str(row.get('posisi_cwt_raw', 'L (KANAN LAYOUT)'))
-                st.session_state.k_lebar_sh = int(row.get('lebar_hoistway', 1430))
-                st.session_state.k_dalam_sh = int(row.get('dalam_hoistway', 1430))
-                st.session_state.k_h_pit = int(row.get('kedalaman_pit', 170))
-                st.session_state.k_h_headroom = int(row.get('tinggi_headroom', 3000))
-                st.session_state.k_jml_lantai = int(row.get('jml_lantai', 3))
-                st.session_state.k_posisi_rel_kabin = int(row.get('posisi_rel_kabin', 670))
-                st.session_state.k_track_gauge_cwt = int(row.get('track_gauge_cwt', 700))
-                st.session_state.k_tebal_rail_cwt = int(row.get('tebal_rail_cwt', 60))
-                st.session_state.k_tebal_pintu_luar = int(row.get('tebal_pintu_luar', 110))
-                st.session_state.k_celah_daun_pintu = int(row.get('celah_daun_pintu', 30))
-                st.session_state.k_tebal_kolom = int(row.get('tebal_kolom', 200))
-                st.session_state.k_lebar_p = int(row.get('lebar_pintu_bersih', 800))
-                st.session_state.k_width_doorway = int(row.get('width_doorway', 950))
-                st.session_state.k_tinggi_p = int(row.get('tinggi_p', 2000))
-                st.session_state.k_tinggi_gembosan = int(row.get('tinggi_gembosan', 2100))
-                st.session_state.k_tebal_l = int(row.get('tebal_l', 300))
-                st.session_state.k_dinding_kiri = int(row.get('dinding_kiri', 400))
-                st.session_state.k_side_tombol = str(row.get('side_tombol', 'KANAN'))
+        # Penambahan On Change Callback pada widget dropdown penarik riwayat proyek
+        st.sidebar.selectbox("Pilih Proyek:", options_list, key="pilihan_proyek_sidebar", on_change=trigger_recall_sync)
 except:
     st.sidebar.info("Sistem Cloud History siap dikonfigurasi melalui Secrets Management.")
 
@@ -356,6 +359,7 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         y_p3_min, y_p3_max = -1200, dalam_sh + 1100
         ax3.set_xlim(x_p3_min, x_p3_max); ax3.set_ylim(y_p3_min, y_p3_max); ax3.axis('off')
         
+        w_wall = 200
         ax3.add_patch(plt.Rectangle((-w_wall, -w_wall), lebar_sh + (2*w_wall), dalam_sh + (2*w_wall), facecolor='none', edgecolor='black', lw=2.5))
         ax3.add_patch(plt.Rectangle((0, 0), lebar_sh, dalam_sh, facecolor='whitesmoke', edgecolor='black', lw=1.5))
         ax3.add_patch(plt.Rectangle((dinding_kiri, -w_wall), width_doorway, w_wall, facecolor='white', edgecolor='none'))
@@ -384,7 +388,7 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         ax3.plot([0, 0], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
         
         ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
-        ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
+        ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
         
         x_dim_depth = lebar_sh + w_sep + 320
         ax3.plot([x_dim_depth, x_dim_depth], [0, dalam_sh], 'r-', lw=1.2)
@@ -519,7 +523,7 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
         ax2.text(x_dim_baseline + 90, elevasi_lintel / 2, f"{elevasi_lintel} mm", color='red', va='center', ha='left', fontsize=10, fontweight='bold')
         ax2.text(x_dim_baseline + 90, elevasi_lintel + (tebal_l / 2), f"{tebal_l} mm Lintel", color='red', va='center', ha='left', fontsize=10, fontweight='bold')
         
-        draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 150, y_p2_max - 30, nama_project, no_kontrak, "DENAH POTONGAN STRUKTUR KOLOM UTAMA (TAMPAK ATAS)" if 'txt_title' in locals() else "OPENING PINTU", 2, 3, zoom_logo=0.25)
+        draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 150, y_p2_max - 30, nama_project, no_kontrak, "OPENING PINTU", 2, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig2, dpi=300); plt.close(fig2)
 
         # HALAMAN 3
@@ -625,32 +629,33 @@ with tab_balok:
     
     with col1:
         st.subheader("Parameter Proyek & Sipil")
-        b_nama_project = st.text_input("Nama Proyek / Klien:", value=st.session_state.b_nama_project, key="b_proj_widget")
-        b_no_kontrak = st.text_input("Nomor Gambar Kerja:", value=st.session_state.b_no_kontrak, key="b_kontrak_widget")
+        # SINKRON TOTAL: Menghapus argumen key static pada widget teks agar dipaksa membaca state callback cloud gsheets secara responsif
+        b_nama_project = st.text_input("Nama Proyek / Klien:", value=st.session_state.b_nama_project)
+        b_no_kontrak = st.text_input("Nomor Gambar Kerja:", value=st.session_state.b_no_kontrak)
         b_config_sep = st.selectbox("Pilihan Konfigurasi Separator Beam:", ['3-SISI', 'KANAN-KIRI', 'KIRI', 'KANAN', 'BELAKANG'], index=['3-SISI', 'KANAN-KIRI', 'KIRI', 'KANAN', 'BELAKANG'].index(st.session_state.b_config_sep))
 
     with col2:
         st.subheader("Dimensi Hoistway Bersih (mm)")
-        b_lebar_sh = st.number_input("Lebar Area Lift / Hoistway (mm):", value=st.session_state.b_lebar_sh, key="b_w_widget")
-        b_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway (mm):", value=st.session_state.b_dalam_sh, key="b_d_widget")
-        b_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=st.session_state.b_h_pit, key="b_pit_widget")
-        b_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=st.session_state.b_h_headroom, key="b_hr_widget")
+        b_lebar_sh = st.number_input("Lebar Area Lift / Hoistway (mm):", value=st.session_state.b_lebar_sh)
+        b_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway (mm):", value=st.session_state.b_dalam_sh)
+        b_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=st.session_state.b_h_pit)
+        b_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=st.session_state.b_h_headroom)
 
     with col3:
         st.subheader("Dimensi Gawang & Penempatan")
-        b_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=st.session_state.b_jml_lantai, key="b_floors_widget")
+        b_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=st.session_state.b_jml_lantai)
         b_travel_list = []
         for i in range(1, b_jml_lantai):
-            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"b_t_{i}_widget")
+            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"b_travel_loop_{i}")
             b_travel_list.append(t_val)
             
-        b_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=st.session_state.b_lebar_p, key="b_pw_widget")
-        b_width_doorway = st.number_input("Lebar Kongleong Opening Sipil (mm):", value=st.session_state.b_width_doorway, key="b_dw_widget")
-        b_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=st.session_state.b_tinggi_p, key="b_ph_widget")
-        b_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang (mm):", value=st.session_state.b_tinggi_gembosan, key="b_gh_widget")
-        b_tebal_l = st.number_input("Tebal Balok Cor Gawang Pintu (mm):", value=st.session_state.b_tebal_l, key="b_lt_widget")
-        b_dinding_kiri = st.number_input("Jarak Dinding Kiri ke Tepi Doorway (mm):", value=st.session_state.b_dinding_kiri, key="b_lwall_widget")
-        b_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Balok):", ["KANAN", "KIRI"], index=["KANAN", "KIRI"].index(st.session_state.b_side_tombol), horizontal=True, key="b_side_btn_widget")
+        b_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=st.session_state.b_lebar_p)
+        b_width_doorway = st.number_input("Lebar Kongleong Opening Sipil (mm):", value=st.session_state.b_width_doorway)
+        b_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=st.session_state.b_tinggi_p)
+        b_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang (mm):", value=st.session_state.b_tinggi_gembosan)
+        b_tebal_l = st.number_input("Tebal Balok Cor Gawang Pintu (mm):", value=st.session_state.b_tebal_l)
+        b_dinding_kiri = st.number_input("Jarak Dinding Kiri ke Tepi Doorway (mm):", value=st.session_state.b_dinding_kiri)
+        b_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Balok):", ["KANAN", "KIRI"], index=["KANAN", "KIRI"].index(st.session_state.b_side_tombol), horizontal=True)
 
     st.write("---")
     st.subheader("Preview Dokumen Cetak Biru Resmi")
@@ -685,40 +690,41 @@ with tab_kolom:
     
     with col_k1:
         st.subheader("Parameter Proyek & Sipil")
-        k_nama_project = st.text_input("Nama Proyek / Klien:", value=st.session_state.k_nama_project, key="k_proj_widget")
-        k_no_kontrak = st.text_input("Nomor Gambar Kerja:", value=st.session_state.k_no_kontrak, key="k_kontrak_widget")
-        k_posisi_cwt = st.radio("Posisi Penempatan CWT Mekanikal:", ["L (KANAN LAYOUT)", "K (KIRI LAYOUT)"], index=["L (KANAN LAYOUT)", "K (KIRI LAYOUT)"].index(st.session_state.k_posisi_cwt), horizontal=True, key="k_cwt_pos_widget")
+        # SINKRON TOTAL: Menghapus seluruh argumen key kaku agar fungsi auto-fill pada Modul B Tiang Struktur ikut responsif
+        k_nama_project = st.text_input("Nama Proyek / Klien: ", value=st.session_state.k_nama_project)
+        k_no_kontrak = st.text_input("Nomor Gambar Kerja: ", value=st.session_state.k_no_kontrak)
+        k_posisi_cwt = st.radio("Posisi Penempatan CWT Mekanikal: ", ["L (KANAN LAYOUT)", "K (KIRI LAYOUT)"], index=["L (KANAN LAYOUT)", "K (KIRI LAYOUT)"].index(st.session_state.k_posisi_cwt), horizontal=True)
         cwt_char = k_posisi_cwt[0]
         
-        k_lebar_sh = st.number_input("Lebar Area Lift / Hoistway Luar Murni (mm):", value=st.session_state.k_lebar_sh, key="k_w_widget")
-        k_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway Luar Murni (mm):", value=st.session_state.k_dalam_sh, key="k_d_widget")
-        k_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=st.session_state.k_h_pit, key="k_pit_widget")
-        k_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=st.session_state.k_h_headroom, key="k_hr_widget")
+        k_lebar_sh = st.number_input("Lebar Area Lift / Hoistway Luar Murni (mm): ", value=st.session_state.k_lebar_sh)
+        k_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway Luar Murni (mm): ", value=st.session_state.k_dalam_sh)
+        k_h_pit = st.number_input("Kedalaman PIT Bersih (mm): ", value=st.session_state.k_h_pit)
+        k_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm): ", value=st.session_state.k_h_headroom)
         
     with col_k2:
         st.subheader("Parameter Mekanikal Rel Kunci")
-        k_posisi_rel_kabin = st.number_input("Jarak AS REL Kabin ke bibir depan car / kabin (mm):", value=st.session_state.k_posisi_rel_kabin, key="k_rail_pos_widget")
-        k_track_gauge_cwt = st.number_input("Jarak antar rel CWT / Secondary Track Gauge (mm):", value=st.session_state.k_track_gauge_cwt, key="k_stg_widget")
-        k_tebal_rail_cwt = st.number_input("Ketebalan fisik profil rel CWT (mm):", value=st.session_state.k_tebal_rail_cwt, key="k_tr_widget")
-        k_tebal_pintu_luar = st.number_input("Ketebalan mekanisme pintu luar (mm):", value=st.session_state.k_tebal_pintu_luar, key="k_out_door_widget")
-        k_celah_daun_pintu = st.number_input("Celah bebas ruang gerak pintu / clearance (mm):", value=st.session_state.k_celah_daun_pintu, key="k_pclear_widget")
-        k_tebal_kolom = st.number_input("Ketebalan/Dimensi Kolom Struktur Yang Diinginkan (mm):", value=st.session_state.k_tebal_kolom, key="k_tk_widget")
+        k_posisi_rel_kabin = st.number_input("Jarak AS REL Kabin ke bibir depan car / kabin (mm):", value=st.session_state.k_posisi_rel_kabin)
+        k_track_gauge_cwt = st.number_input("Jarak antar rel CWT / Secondary Track Gauge (mm):", value=st.session_state.k_track_gauge_cwt)
+        k_tebal_rail_cwt = st.number_input("Ketebalan fisik profil rel CWT (mm):", value=st.session_state.k_tebal_rail_cwt)
+        k_tebal_pintu_luar = st.number_input("Ketebalan mekanisme pintu luar (mm):", value=st.session_state.k_tebal_pintu_luar)
+        k_celah_daun_pintu = st.number_input("Celah bebas ruang gerak pintu / clearance (mm):", value=st.session_state.k_celah_daun_pintu)
+        k_tebal_kolom = st.number_input("Ketebalan/Dimensi Kolom Struktur Yang Diinginkan (mm):", value=st.session_state.k_tebal_kolom)
 
     with col_k3:
         st.subheader("Dimensi Gawang Opening Depan")
-        k_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=st.session_state.k_jml_lantai, key="k_floors_widget")
+        k_jml_lantai = st.number_input("Jumlah Lantai (Stop): ", min_value=2, max_value=10, value=st.session_state.k_jml_lantai)
         k_travel_list = []
         for i in range(1, k_jml_lantai):
-            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"k_t_{i}_widget")
+            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm): ", value=3500, key=f"k_travel_loop_{i}")
             k_travel_list.append(t_val)
             
-        k_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=st.session_state.k_lebar_p, key="k_pw_col_widget")
-        k_width_doorway = st.number_input("Lebar Kongleong Sipil Opening (mm):", value=st.session_state.k_width_doorway, key="k_dw_col_widget")
-        k_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=st.session_state.k_tinggi_p, key="k_ph_col_widget")
-        k_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang Pintu (mm):", value=st.session_state.k_tinggi_gembosan, key="k_gh_col_widget")
-        k_tebal_l = st.number_input("Tebal Balok Cor Lintel di atas pintu (mm):", value=st.session_state.k_tebal_l, key="k_lt_col_widget")
-        k_dinding_kiri = st.number_input("Jarak asimetris dinding kiri KUPINGAN OPENING (mm):", value=st.session_state.k_dinding_kiri, key="k_lwall_col_widget")
-        k_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Kolom):", ["KANAN", "KIRI"], index=["KANAN", "KIRI"].index(st.session_state.k_side_tombol), horizontal=True, key="k_side_btn_widget")
+        k_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm): ", value=st.session_state.k_lebar_p)
+        k_width_doorway = st.number_input("Lebar Kongleong Sipil Opening (mm): ", value=st.session_state.k_width_doorway)
+        k_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm): ", value=st.session_state.k_tinggi_p)
+        k_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang Pintu (mm): ", value=st.session_state.k_tinggi_gembosan)
+        k_tebal_l = st.number_input("Tebal Balok Cor Lintel di atas pintu (mm): ", value=st.session_state.k_tebal_l)
+        k_dinding_kiri = st.number_input("Jarak asimetris dinding kiri KUPINGAN OPENING (mm): ", value=st.session_state.k_dinding_kiri)
+        k_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Kolom): ", ["KANAN", "KIRI"], index=["KANAN", "KIRI"].index(st.session_state.k_side_tombol), horizontal=True)
 
     st.write("---")
     st.subheader("Preview Dokumen Cetak Biru Resmi")
@@ -729,7 +735,7 @@ with tab_kolom:
         k_lebar_p, k_width_doorway, k_tinggi_p, k_tinggi_gembosan, k_tebal_l, k_dinding_kiri, k_nama_project, k_no_kontrak, cwt_char, k_side_tombol
     )
     
-    st.success(f"Gambar Kerja Resmi Tiang Kolom Struktur Untuk {k_nama_project} Berhasil Di-kalan-kiri.")
+    st.success(f"Gambar Kerja Resmi Tiang Kolom Struktur Untuk {k_nama_project} Berhasil Di-kalkulasi.")
     st.download_button(
         label="💾 Unduh Gambar Kerja Resmi Kolom Struktur (PDF)",
         data=kolom_pdf_data,
@@ -741,7 +747,7 @@ with tab_kolom:
         payload_b = {
             "nama_project": k_nama_project, "no_drawing": k_no_kontrak, "tipe_modul": "Column Structure",
             "lebar_hoistway": k_lebar_sh, "dalam_hoistway": k_dalam_sh, "kedalaman_pit": k_h_pit, "tinggi_headroom": k_h_headroom,
-            "jml_lantai": k_f_num, "lebar_pintu_bersih": k_lebar_p, "width_doorway": k_width_doorway,
+            "jml_lantai": k_jml_lantai, "lebar_pintu_bersih": k_lebar_p, "width_doorway": k_width_doorway,
             "tinggi_p": k_tinggi_p, "tinggi_gembosan": k_tinggi_gembosan, "tebal_l": k_tebal_l, "dinding_kiri": k_dinding_kiri,
             "side_tombol": k_side_tombol, "posisi_cwt_raw": k_posisi_cwt, "posisi_rel_kabin": k_posisi_rel_kabin,
             "track_gauge_cwt": k_track_gauge_cwt, "tebal_rail_cwt": k_tebal_rail_cwt, "tebal_pintu_luar": k_tebal_pintu_luar,
