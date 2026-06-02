@@ -1,5 +1,5 @@
 import streamlit as st
-import matplotlib.pyplot as plt
+import matplotlib.subplots as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.image as mpimg
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -27,25 +27,25 @@ state_keys = [
     "k_lebar_p", "k_width_doorway", "k_tinggi_p", "k_tinggi_gembosan", "k_tebal_l", "k_dinding_kiri", "k_side_tombol"
 ]
 
-# Set nilai default murni bawaan program asli jika session masih kosong saat pertama kali dibuka
+# Set nilai default murni bawaan jika session masih kosong saat pertama kali dibuka
 for k in state_keys:
     if k not in st.session_state:
-        if "nama" in k or "proj" in k: st.session_state[k] = "GUNAWAN-JKT"
+        if "nama" in k: st.session_state[k] = "GUNAWAN-JKT"
         elif "no" in k or "kontrak" in k: st.session_state[k] = " "
-        elif "side_btn" in k or "tombol" in k: st.session_state[k] = "KANAN"
+        elif "side_tombol" in k: st.session_state[k] = "KANAN"
         elif "config_sep" in k: st.session_state[k] = "3-SISI"
         elif "posisi_cwt" in k: st.session_state[k] = "L (KANAN LAYOUT)"
-        elif "floors" in k or "jml_lantai" in k: st.session_state[k] = 3
-        elif "lebar_sh" in k or "b_w" in k: st.session_state[k] = 1700 if "b_" in k else 1430
-        elif "dalam_sh" in k or "b_d" in k: st.session_state[k] = 1500 if "b_" in k else 1430
-        elif "h_pit" in k or "pit" in k: st.session_state[k] = 170
-        elif "headroom" in k or "b_hr" in k or "k_hr" in k: st.session_state[k] = 3000
-        elif "lebar_p" in k or "pw" in k: st.session_state[k] = 800
-        elif "width_doorway" in k or "dw" in k: st.session_state[k] = 950
-        elif "tinggi_p" in k or "ph" in k: st.session_state[k] = 2000
-        elif "gembosan" in k or "gh" in k: st.session_state[k] = 2100
-        elif "tebal_l" in k or "lt" in k: st.session_state[k] = 300
-        elif "dinding_kiri" in k or "lwall" in k: st.session_state[k] = 375 if "b_" in k else 400
+        elif "jml_lantai" in k: st.session_state[k] = 3
+        elif "lebar_sh" in k: st.session_state[k] = 1700 if "b_" in k else 1430
+        elif "dalam_sh" in k: st.session_state[k] = 1500 if "b_" in k else 1430
+        elif "h_pit" in k: st.session_state[k] = 170
+        elif "headroom" in k: st.session_state[k] = 3000
+        elif "lebar_p" in k: st.session_state[k] = 800
+        elif "width_doorway" in k: st.session_state[k] = 950
+        elif "tinggi_p" in k: st.session_state[k] = 2000
+        elif "gembosan" in k: st.session_state[k] = 2100
+        elif "tebal_l" in k: st.session_state[k] = 300
+        elif "dinding_kiri" in k: st.session_state[k] = 375 if "b_" in k else 400
         elif "rel_kabin" in k: st.session_state[k] = 670
         elif "gauge_cwt" in k: st.session_state[k] = 700
         elif "rail_cwt" in k: st.session_state[k] = 60
@@ -298,7 +298,7 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
                 ax1.text(x_right_dim + 130, mid_y, f"{int(el['height'])}", color='dimgray', va='center', ha='left', fontsize=9.5)
 
         ax1.plot([col1_x, col1_x + lebar_sh], [-180, -180], 'r-', lw=1.5)
-        ax1.text(col1_x + (lebar_sh/2), -220, "Sepanjang Shaft", color='red', ha='center', va='top', fontweight='bold', fontsize=11)
+        ax1.text(col1_x + (lebar_sh/2), -220, f"Clear Width: {lebar_sh} mm", color='red', ha='center', va='top', fontweight='bold', fontsize=11)
         
         draw_rigid_border(ax1, x_min + 50, x_max - 50, y_min + 50, y_max - 50, nama_project, no_kontrak, "SEPARATOR BEAM", 1, 3, zoom_logo=0.15)
         plt.tight_layout(); pdf.savefig(fig1, dpi=300); plt.close(fig1)
@@ -329,8 +329,6 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
             
         ax2.plot([x_hole - 50, x_hole + 50], [1200, 1200], 'r-', lw=1)
         ax2.plot(x_hole, 1200, 'ko', markersize=10, fillstyle='none', lw=1.5)
-        
-        # PERBAIKAN MUTLAK: Mengubah kurung bersarang (xy_text_pos, 1000) menjadi xy_text_pos agar terbaca tuple tunggal numerik murni
         ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=xy_text_pos,
                      arrowprops=dict(arrowstyle="->", color="black", lw=1.2, connectionstyle=f"arc3,rad={rad_val}"),
                      fontsize=9, color='black', fontweight='bold', ha='center', va='top')
@@ -386,13 +384,13 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         ax3.plot([0, 0], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
         
         ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
-        ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
+        ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
         
         x_dim_depth = lebar_sh + w_sep + 320
         ax3.plot([x_dim_depth, x_dim_depth], [0, dalam_sh], 'r-', lw=1.2)
         ax3.plot([lebar_sh, x_dim_depth + 40], [0, 0], 'r-', lw=0.6)
         ax3.plot([lebar_sh, x_dim_depth + 40], [dalam_sh, dalam_sh], 'r-', lw=0.6)
-        ax3.text(x_dim_depth + 50, dalam_sh / 2, f"Clear Depth of Shaft:\n{dalam_sh} mm", color='red', va='center', ha='left', fontweight='bold', fontsize=11)
+        ax3.text(x_dim_depth + 50, dalam_sh / 2, f"Clear Depth:\n{dalam_sh} mm", color='red', va='center', ha='left', fontweight='bold', fontsize=11)
 
         draw_rigid_border(ax3, x_p3_min + 30, x_p3_max - 30, y_p3_min + 150, y_p3_max - 30, nama_project, no_kontrak, "HOISTWAY", 3, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig3, dpi=300); plt.close(fig3)
