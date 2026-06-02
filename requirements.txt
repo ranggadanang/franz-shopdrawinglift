@@ -2,3 +2,5 @@ streamlit
 matplotlib
 ezdxf
 Pillow
+pandas
+st-gsheets-connection

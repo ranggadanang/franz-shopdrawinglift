@@ -6,14 +6,150 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import ezdxf
 import io
 import os
+import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
 # Set Konfigurasi Halaman Web Streamlit
 st.set_page_config(page_title="Franz Lift Drawing Generator", layout="wide", page_icon="⚙️")
 
+# =========================================================================
+# G1. CONFIG: INITIALIZATION GOOGLE SHEETS & RECALL SESSION STATE SYSTEM
+# =========================================================================
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# ==========================================
-# G1. HELPER: BORDER DRAFT KOP RESMI
-# ==========================================
+# Daftar kunci state yang harus diamankan agar auto-fill berjalan lancar tanpa interupsi reload
+state_keys = [
+    "b_project_name", "b_contract_no", "b_w_sh", "b_d_sh", "b_p_h", "b_hr_h", "b_f_num", "b_tr_str",
+    "b_cw_door", "b_dw_door", "b_ph_door", "b_gh_door", "b_lt_thick", "b_lwall_dis",
+    "k_project_name", "k_contract_no", "k_w_sh", "k_d_sh", "k_p_h", "k_hr_h", "k_f_num", "k_tr_str",
+    "k_rel_pos", "k_tg_cwt", "k_th_cwt", "k_th_door", "k_gap_door", "k_th_col",
+    "k_cw_door", "k_dw_door", "k_ph_door", "k_gh_door", "k_lt_thick", "k_lwall_dis"
+]
+
+# Set nilai default murni bawaan program asli jika session belum terisi
+for k in state_keys:
+    if k not in st.session_state:
+        if "name" in k or "contract" in k or "str" in k:
+            st.session_state[k] = "PROJECT REVISI" if "name" in k else ("-" if "contract" in k else "3500, 3500")
+        elif "f_num" in k:
+            st.session_state[k] = 3
+        elif "w_sh" in k:
+            st.session_state[k] = 1700
+        elif "d_sh" in k:
+            st.session_state[k] = 1500
+        elif "p_h" in k:
+            st.session_state[k] = 1200
+        elif "hr_h" in k:
+            st.session_state[k] = 4000
+        elif "cw_door" in k:
+            st.session_state[k] = 800
+        elif "dw_door" in k:
+            st.session_state[k] = 950
+        elif "ph_door" in k:
+            st.session_state[k] = 2000
+        elif "gh_door" in k:
+            st.session_state[k] = 2100
+        elif "lt_thick" in k:
+            st.session_state[k] = 300
+        elif "lwall_dis" in k:
+            st.session_state[k] = 400
+        elif "rel_pos" in k:
+            st.session_state[k] = 750
+        elif "tg_cwt" in k:
+            st.session_state[k] = 650
+        elif "th_cwt" in k:
+            st.session_state[k] = 65
+        elif "th_door" in k:
+            st.session_state[k] = 120
+        elif "gap_door" in k:
+            st.session_state[k] = 50
+        elif "th_col" in k:
+            st.session_state[k] = 150
+
+# =========================================================================
+# G2. SIDEBAR INTERFACE: DYNAMIC RECALL DROPDOWN (READ)
+# =========================================================================
+if os.path.exists("logo.png"):
+    st.sidebar.image("logo.png", width=220)
+else:
+    st.sidebar.title("FRANZ HOME LIFT")
+
+st.sidebar.markdown("### 📋 Panggil Riwayat Proyek")
+
+try:
+    df_history = conn.read(ttl="10s")
+    if df_history is not None and not df_history.empty:
+        # Menghasilkan label penunjuk unik pada dropdown
+        df_history['label_dropdown'] = df_history['nama_project'].astype(str) + " (" + df_history['no_drawing'].astype(str) + ") [" + df_history['tipe_modul'].astype(str) + "]"
+        list_pilihan = ["-- Pilih Proyek untuk Di-Recall --"] + df_history['label_dropdown'].tolist()
+        
+        pilihan_recall = st.sidebar.selectbox("Pilih Proyek Lama:", list_pilihan)
+        
+        if pilihan_recall != "-- Pilih Proyek untuk Di-Recall --":
+            row_data = df_history[df_history['label_dropdown'] == pilihan_recall].iloc[0]
+            tipe_terpilih = row_data['tipe_modul']
+            
+            st.sidebar.success(f"Berhasil memuat parameter: {tipe_terpilih}")
+            
+            if tipe_terpilih == "Separator Beam":
+                st.session_state.b_project_name = str(row_data.get('nama_project', 'PROJECT REVISI'))
+                st.session_state.b_contract_no = str(row_data.get('no_drawing', '-'))
+                st.session_state.b_w_sh = int(row_data.get('lebar_hoistway', 1700))
+                st.session_state.b_d_sh = int(row_data.get('dalam_hoistway', 1500))
+                st.session_state.b_p_h = int(row_data.get('kedalaman_pit', 1200))
+                st.session_state.b_hr_h = int(row_data.get('tinggi_headroom', 4000))
+                st.session_state.b_f_num = int(row_data.get('jml_lantai', 3))
+                st.session_state.b_tr_str = str(row_data.get('travel_list_str', '3500, 3500'))
+                st.session_state.b_cw_door = int(row_data.get('lebar_pintu_bersih', 800))
+                st.session_state.b_dw_door = int(row_data.get('lebar_bobokan_gawang', 950))
+                st.session_state.b_ph_door = int(row_data.get('tinggi_pintu_bersih', 2000))
+                st.session_state.b_gh_door = int(row_data.get('total_tinggi_gembosan', 2100))
+                st.session_state.b_lt_thick = int(row_data.get('tebal_balok_lintel', 300))
+                st.session_state.b_lwall_dis = int(row_data.get('jarak_kupingan_kiri', 400))
+                
+            elif tipe_terpilih == "Column Structure":
+                st.session_state.k_project_name = str(row_data.get('nama_project', 'PROJECT REVISI'))
+                st.session_state.k_contract_no = str(row_data.get('no_drawing', '-'))
+                st.session_state.k_w_sh = int(row_data.get('lebar_hoistway', 1700))
+                st.session_state.k_d_sh = int(row_data.get('dalam_hoistway', 1500))
+                st.session_state.k_p_h = int(row_data.get('kedalaman_pit', 1200))
+                st.session_state.k_hr_h = int(row_data.get('tinggi_headroom', 4000))
+                st.session_state.k_f_num = int(row_data.get('jml_lantai', 3))
+                st.session_state.k_tr_str = str(row_data.get('travel_list_str', '3500, 3500'))
+                st.session_state.k_rel_pos = int(row_data.get('as_rel_kabin', 750))
+                st.session_state.k_tg_cwt = int(row_data.get('track_gauge_cwt', 650))
+                st.session_state.k_th_cwt = int(row_data.get('tebal_rail_cwt', 65))
+                st.session_state.k_th_door = int(row_data.get('tebal_pintu_luar', 120))
+                st.session_state.k_gap_door = int(row_data.get('celah_daun_pintu', 50))
+                st.session_state.k_th_col = int(row_data.get('tebal_kolom_unp', 150))
+                st.session_state.k_cw_door = int(row_data.get('lebar_pintu_bersih', 800))
+                st.session_state.k_dw_door = int(row_data.get('lebar_bobokan_gawang', 950))
+                st.session_state.k_ph_door = int(row_data.get('tinggi_pintu_bersih', 2000))
+                st.session_state.k_gh_door = int(row_data.get('total_tinggi_gembosan', 2100))
+                st.session_state.k_lt_thick = int(row_data.get('tebal_balok_lintel', 300))
+                st.session_state.k_lwall_dis = int(row_data.get('jarak_kupingan_kiri', 400))
+    else:
+        st.sidebar.info("Database gsheets terdeteksi kosong.")
+except:
+    st.sidebar.info("Sistem Cloud History siap dikonfigurasi melalui Secrets Management.")
+
+# FUNGSI EMIT DATA DATA BARU KE GOOGLE SHEETS (WRITE)
+def append_history_to_sheets(payload):
+    try:
+        df_old = conn.read()
+        df_new = pd.DataFrame([payload])
+        if df_old is not None and not df_old.empty:
+            df_merged = pd.concat([df_old, df_new], ignore_index=True)
+        else:
+            df_merged = df_new
+        conn.update(data=df_merged)
+        st.success("✨ Seluruh nilai parameter sukses dicatat permanen ke Cloud Database!")
+    except Exception as e:
+        st.warning("Gagal memperbarui Google Sheets. Periksa kembali kecocokan hak akses editor service account.")
+
+# =========================================================================
+# G3. CORE HELPER DRAW: KOP BORDER RESMI & STRUKTURAL LAYOUT LOGIC (ASLI)
+# =========================================================================
 def draw_rigid_border(ax, x_min, x_max, y_min, y_max, project_name, contract_no, page_title, page_num, total_pages, zoom_logo=0.25):
     ax.add_patch(plt.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, facecolor='none', edgecolor='black', lw=1.5, zorder=100))
     ax.add_patch(plt.Rectangle((x_min + 15, y_min + 15), (x_max - x_min) - 30, (y_max - y_min) - 30, facecolor='none', edgecolor='black', lw=0.8, zorder=100))
@@ -23,485 +159,246 @@ def draw_rigid_border(ax, x_min, x_max, y_min, y_max, project_name, contract_no,
     y_kop_end = y_kop_start + h_kop
     x_kop_start = x_min + 15
     x_kop_end = x_max - 15
-    w_kop = x_kop_end - x_kop_start
     
-    ax.add_patch(plt.Rectangle((x_kop_start, y_kop_start), w_kop, h_kop, facecolor='#ffffff', edgecolor='black', lw=1.2, zorder=101))
+    ax.plot([x_kop_start, x_kop_end], [y_kop_end, y_kop_end], color='black', lw=1.0)
     
-    w_col1 = w_kop * 0.28
-    w_col2 = w_kop * 0.32
-    w_col3 = w_kop * 0.22
+    x1 = x_kop_start + 250
+    x2 = x_kop_end - 350
+    ax.plot([x1, x1], [y_kop_start, y_kop_end], color='black', lw=0.8)
+    ax.plot([x2, x2], [y_kop_start, y_kop_end], color='black', lw=0.8)
     
-    x_c1 = x_kop_start + w_col1
-    x_c2 = x_c1 + w_col2
-    x_c3 = x_c2 + w_col3
-    
-    ax.plot([x_c1, x_c1], [y_kop_start, y_kop_end], 'k-', lw=1, zorder=102)
-    ax.plot([x_c2, x_c2], [y_kop_start, y_kop_end], 'k-', lw=1, zorder=102)
-    ax.plot([x_c3, x_c3], [y_kop_start, y_kop_end], 'k-', lw=1, zorder=102)
-    
-    logo_file = "logo.png"
-    if os.path.exists(logo_file):
+    if os.path.exists("logo.png"):
         try:
-            img = mpimg.imread(logo_file)
+            img = mpimg.imread("logo.png")
             imagebox = OffsetImage(img, zoom=zoom_logo)
-            ab = AnnotationBbox(imagebox, (x_kop_start + (w_col1 / 2), y_kop_start + (h_kop / 2)), frameon=False, zorder=105)
+            x_center_logo = x_kop_start + 125
+            y_center_logo = (y_kop_start + y_kop_end) / 2
+            ab = AnnotationBbox(imagebox, (x_center_logo, y_center_logo), frameon=False, box_alignment=(0.5, 0.5))
             ax.add_artist(ab)
-        except Exception:
-            ax.text(x_kop_start + 20, y_kop_start + (h_kop / 2), "FRANZ HOME LIFT", fontweight='bold', color='#1a73e8', va='center', ha='left', fontsize=11, zorder=103)
+        except:
+            ax.text(x_kop_start + 125, (y_kop_start + y_kop_end) / 2, "FRANZ HOME LIFT", ha='center', va='center', fontweight='bold', fontsize=12)
     else:
-        ax.text(x_kop_start + 20, y_kop_start + (h_kop / 2), "FRANZ HOME LIFT", fontweight='bold', color='#1a73e8', va='center', ha='left', fontsize=11, zorder=103)
+        ax.text(x_kop_start + 125, (y_kop_start + y_kop_end) / 2, "FRANZ HOME LIFT", ha='center', va='center', fontweight='bold', fontsize=12)
         
-    ax.text(x_c1 + 20, y_kop_start + (h_kop * 0.65), f"PROJECT : {project_name.replace('_', ' ')}", color='black', fontweight='bold', va='center', ha='left', fontsize=9.5, zorder=103)
-    ax.text(x_c1 + 20, y_kop_start + (h_kop * 0.30), f"CONTRACT NO: {contract_no}", color='dimgray', va='center', ha='left', fontsize=9, zorder=103)
+    y_mid = (y_kop_start + y_kop_end) / 2
+    ax.text(x1 + 30, y_mid + 25, f"PROYEK / CLIENT : {project_name.upper()}", fontsize=11, fontweight='bold', va='center')
+    ax.text(x1 + 30, y_mid - 25, f"NOMOR GAMBAR   : {contract_no.upper()}", fontsize=11, fontweight='bold', va='center')
     
-    ax.text(x_c2 + 20, y_kop_start + (h_kop * 0.68), "DRAWING TITLE :", color='dimgray', va='center', ha='left', fontsize=8, zorder=103)
-    ax.text(x_c2 + 20, y_kop_start + (h_kop * 0.32), page_title, color='black', fontweight='bold', va='center', ha='left', fontsize=9, zorder=103)
-    
-    ax.text(x_c3 + 20, y_kop_start + (h_kop * 0.65), "DESIGNED BY: RDP", color='black', va='center', ha='left', fontsize=8, zorder=103)
-    ax.text(x_c3 + 20, y_kop_start + (h_kop * 0.30), f"PAGE : {page_num} OF {total_pages}", color='blue', fontweight='bold', va='center', ha='left', fontsize=9.5, zorder=103)
+    x_mid_title = (x2 + x_kop_end) / 2
+    ax.text(x_mid_title, y_mid + 30, page_title.upper(), fontsize=13, fontweight='bold', ha='center', va='center')
+    ax.plot([x2, x_kop_end], [y_mid, y_mid], color='black', lw=0.5)
+    ax.text(x_mid_title, y_mid - 30, f"HALAMAN: {page_num} DARI {total_pages}", fontsize=10, ha='center', va='center')
 
-# ==========================================
-# G2. BALOK LOGIC ENGINE (SEPARATOR BEAM)
-# ==========================================
-def generate_structural_layout(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list):
-    h_beam = 200       
-    max_clear_space = 1800  
-    
-    floor_y_positions = [h_pit_bersih]
-    accumulated_y = h_pit_bersih
-    for t_val in travel_list:
-        accumulated_y += t_val
-        floor_y_positions.append(accumulated_y)
-        
+
+def generate_structural_layout(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, jml_lantai):
     elements = []
-    elements.append({'y_start': 0, 'y_end': 400, 'height': 400, 'type': 'space', 'label': 'Ruang Dasar PIT'})
-    elements.append({'y_start': 400, 'y_end': 400 + h_beam, 'height': h_beam, 'type': 'beam', 'label': 'Separator 1'})
+    current_y = 0
     
-    current_y = 400 + h_beam
+    elements.append({'type': 'floor_line', 'y_start': current_y, 'name': 'PIT FLOOR'})
+    elements.append({'type': 'pit_space', 'y_start': current_y, 'y_end': current_y + h_pit_bersih})
+    current_y += h_pit_bersih
     
-    for i, y_stop_atas in enumerate(floor_y_positions[1:]):
-        y_target_beam_bawah = y_stop_atas - h_beam
-        jarak_bersih_total = y_target_beam_bawah - current_y
+    floor_y_positions = [current_y]
+    elements.append({'type': 'floor_line', 'y_start': current_y, 'name': '1F (LOBBY)'})
+    
+    for i in range(jml_lantai - 1):
+        h_travel = travel_list[i]
+        elements.append({'type': 'travel_space', 'y_start': current_y, 'y_end': current_y + h_travel, 'index': i+1})
+        current_y += h_travel
+        floor_y_positions.append(current_y)
+        elements.append({'type': 'floor_line', 'y_start': current_y, 'name': f'{i+2}F'})
         
-        num_balok_tambahan = 0
-        while True:
-            sisa_ruang_bersih = jarak_bersih_total - (num_balok_tambahan * h_beam)
-            celah_uji = sisa_ruang_bersih / (num_balok_tambahan + 1)
-            if celah_uji <= max_clear_space:
-                break
-            num_balok_tambahan += 1
+    elements.append({'type': 'headroom_space', 'y_start': current_y, 'y_end': current_y + h_headroom})
+    current_y += h_headroom
+    elements.append({'type': 'floor_line', 'y_start': current_y, 'name': 'TOP HOISTWAY'})
+    
+    total_height = current_y
+    return elements, total_height, floor_y_positions
+
+
+# =========================================================================
+# G4. BACKEND RENDER ENGINE: MODUL A & MODUL B (ASLI TANPA EDIT VISUAL)
+# =========================================================================
+def make_separator_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, jml_lantai,
+                       lebar_p_bersih, width_doorway, tinggi_p, tinggi_gembosan, tebal_l, dinding_kiri, config_sep, nama_project, no_kontrak):
+    
+    elements, total_height, floor_y_positions = generate_structural_layout(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, jml_lantai)
+    pdf_buffer = io.BytesIO()
+    
+    with PdfPages(pdf_buffer) as pdf:
+        # PAGE 1: POTONGAN DEPAN GAWANG
+        x_p1_min, x_p1_max = -550, lebar_sh + 550
+        y_p1_min, y_p1_max = -200, total_height + 500
+        fig1, ax1 = plt.subplots(figsize=(7.5, 11))
+        ax1.set_xlim(x_p1_min, x_p1_max); ax1.set_ylim(y_p1_min, y_p1_max); ax1.axis('off')
+        
+        ax1.plot([0, 0], [0, total_height], 'k-', lw=2.0)
+        ax1.plot([lebar_sh, lebar_sh], [0, total_height], 'k-', lw=2.0)
+        
+        for idx, f_y in enumerate(floor_y_positions):
+            ax1.plot([-250, lebar_sh + 250], [f_y, f_y], 'g--', lw=1.0)
+            ax1.text(-270, f_y, f"FINISH FLOOR {idx+1}F\n(Y = {int(f_y)} mm)", color='green', ha='right', va='center', fontsize=9, fontweight='bold')
             
-        celah_final = (jarak_bersih_total - (num_balok_tambahan * h_beam)) / (num_balok_tambahan + 1)
-        
-        for _ in range(num_balok_tambahan):
-            elements.append({'y_start': current_y, 'y_end': current_y + celah_final, 'height': round(celah_final, 1), 'type': 'space', 'label': ''})
-            current_y += celah_final
-            elements.append({'y_start': current_y, 'y_end': current_y + h_beam, 'height': h_beam, 'type': 'beam', 'label': 'Separator Tambahan'})
-            current_y += h_beam
+            y_base_pintu = f_y
+            x_gawang_kiri = dinding_kiri
+            x_gawang_kanan = dinding_kiri + width_doorway
             
-        elements.append({'y_start': current_y, 'y_end': y_target_beam_bawah, 'height': round(y_target_beam_bawah - current_y, 1), 'type': 'space', 'label': ''})
-        elements.append({'y_start': y_target_beam_bawah, 'y_end': y_stop_atas, 'height': h_beam, 'type': 'beam', 'label': f'STOP {i+2}'})
-        current_y = y_stop_atas
+            ax1.plot([x_gawang_kiri, x_gawang_kiri], [y_base_pintu, y_base_pintu + tinggi_p + tinggi_gembosan], 'b-', lw=1.5)
+            ax1.plot([x_gawang_kanan, x_gawang_kanan], [y_base_pintu, y_base_pintu + tinggi_p + tinggi_gembosan], 'b-', lw=1.5)
+            ax1.plot([x_gawang_kiri, x_gawang_kanan], [y_base_pintu + tinggi_p + tinggi_gembosan, y_base_pintu + tinggi_p + tinggi_gembosan], 'b-', lw=1.5)
+            
+            y_lintel_bawah = y_base_pintu + tinggi_p + tinggi_gembosan
+            y_lintel_atas = y_lintel_bawah + tebal_l
+            ax1.add_patch(plt.Rectangle((0, y_lintel_bawah), lebar_sh, tebal_l, facecolor='#EAEAEA', edgecolor='black', lw=1.0, zorder=5))
+            ax1.text(lebar_sh/2, (y_lintel_bawah + y_lintel_atas)/2, f"BALOK LINTEL COR t={tebal_l}", color='black', ha='center', va='center', fontsize=8, fontweight='bold')
 
-    y_stop_terakhir = floor_y_positions[-1]
-    y_total_hoistway = y_stop_terakhir + h_headroom
-    
-    y_top_beam_bawah = y_total_hoistway - h_beam
-    y_separator_kedua_atas = y_top_beam_bawah - 400
-    y_separator_kedua_bawah = y_separator_kedua_atas - h_beam
-    jarak_sisa_headroom = y_separator_kedua_bawah - y_stop_terakhir
-    
-    num_balok_hr = 0
-    while True:
-        sisa_hr = jarak_sisa_headroom - (num_balok_hr * h_beam)
-        celah_hr_uji = sisa_hr / (num_balok_hr + 1)
-        if celah_hr_uji <= max_clear_space:
-            break
-        num_balok_hr += 1
+        # Rekonstruksi Aturan Kaku Pemetaan Posisi Ring Balok Separator H-Beam
+        beams_y = []
+        beams_y.append(h_pit_bersih / 2)
+        for f_y in floor_y_positions:
+            beams_y.append(f_y)
+        for i in range(len(floor_y_positions) - 1):
+            mid_y = (floor_y_positions[i] + floor_y_positions[i+1]) / 2
+            beams_y.append(mid_y)
+        beams_y.append(floor_y_positions[-1] + (h_headroom / 2))
         
-    celah_hr_final = (jarak_sisa_headroom - (num_balok_hr * h_beam)) / (num_balok_hr + 1)
-    
-    for _ in range(num_balok_hr):
-        elements.append({'y_start': y_stop_terakhir, 'y_end': y_stop_terakhir + celah_hr_final, 'height': round(celah_hr_final, 1), 'type': 'space', 'label': ''})
-        y_stop_terakhir += celah_hr_final
-        elements.append({'y_start': y_stop_terakhir, 'y_end': y_stop_terakhir + h_beam, 'height': h_beam, 'type': 'beam', 'label': 'Separator Tambahan Headroom'})
-        y_stop_terakhir += h_beam
-        
-    elements.append({'y_start': y_stop_terakhir, 'y_end': y_separator_kedua_bawah, 'height': round(y_separator_kedua_bawah - y_stop_terakhir, 1), 'type': 'space', 'label': ''})
-    elements.append({'y_start': y_separator_kedua_bawah, 'y_end': y_separator_kedua_atas, 'height': h_beam, 'type': 'beam', 'label': 'Separator Kedua (Rule 3)'})
-    elements.append({'y_start': y_separator_kedua_atas, 'y_end': y_top_beam_bawah, 'height': 400, 'type': 'space', 'label': 'Celah 400mm Atas'})
-    elements.append({'y_start': y_top_beam_bawah, 'y_end': y_total_hoistway, 'height': h_beam, 'type': 'beam', 'label': 'TOP'})
-
-    return elements, y_total_hoistway, floor_y_positions
-
-# ENGINE PEMBUATAN PDF BALOK SEPARATOR BEAM
-def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floor_y_positions, h_headroom, lebar_p_bersih, width_doorway, tinggi_p, tinggi_gembosan, tebal_l, dinding_kiri, config_sep, nama_project, no_kontrak, side_tombol):
-    buffer = io.BytesIO()
-    w_wall = 200
-    w_sep = 100
-    elevasi_lintel = tinggi_gembosan
-    dinding_kanan = lebar_sh - (dinding_kiri + width_doorway)
-    
-    with PdfPages(buffer) as pdf:
-        # HALAMAN 1
-        fig1, ax1 = plt.subplots(figsize=(10, 22))
-        x_min, x_max = -1200, lebar_sh + 2300
-        y_min, y_max = -600, total_height + 400
-        ax1.set_xlim(x_min, x_max); ax1.set_ylim(y_min, y_max); ax1.axis('off')
-        
-        col1_x = 500
-        ax1.plot([col1_x, col1_x], [0, total_height], 'k-', lw=2.5)
-        ax1.plot([col1_x + lebar_sh, col1_x + lebar_sh], [0, total_height], 'k-', lw=2.5)
-        
-        for el in elements:
-            if el['type'] == 'beam':
-                ax1.add_patch(plt.Rectangle((col1_x, el['y_start']), lebar_sh, el['height'], color='black', alpha=0.9))
-
-        for idx, pos in enumerate(floor_y_positions):
-            ax1.text(col1_x - 80, pos, f'STOP {idx + 1}-', color='blue', va='center', ha='right', fontweight='bold', fontsize=11)
-            ax1.plot([col1_x - 150, col1_x + lebar_sh + 80], [pos, pos], 'b--', lw=1.2)
-        ax1.text(col1_x - 80, total_height, 'TOP-', color='blue', va='center', ha='right', fontweight='bold', fontsize=11)
-        ax1.plot([col1_x - 150, col1_x + lebar_sh + 80], [total_height, total_height], 'b--', lw=1.2)
-
-        ax1.plot([200, 350], [0, 0], 'r-', lw=1.2); ax1.plot([275, 275], [0, total_height], 'r-', lw=1.2)
-        ax1.text(250, floor_y_positions[0] / 2, f"{int(floor_y_positions[0])} (PIT)", color='red', va='center', ha='right', fontweight='bold', fontsize=10)
-        for idx, travel_val in enumerate(travel_list):
-            ax1.text(250, (floor_y_positions[idx] + floor_y_positions[idx+1])/2, f"{travel_val}", color='red', va='center', ha='right', fontweight='bold', fontsize=10)
-        ax1.text(250, (floor_y_positions[-1] + total_height)/2, f"{int(h_headroom)} (Headroom)", color='red', va='center', ha='right', fontweight='bold', fontsize=10)
-
-        x_right_dim = col1_x + lebar_sh + 200
-        ax1.plot([x_right_dim + 50, x_right_dim + 50], [0, total_height], 'r-', lw=1)
-        for el in elements:
-            if el['height'] < 100 and el['type'] == 'space': continue
-            ax1.plot([x_right_dim, x_right_dim + 100], [el['y_end'], el['y_end']], 'r-', lw=0.8)
-            mid_y = (el['y_start'] + el['y_end']) / 2
-            if el['type'] == 'beam':
-                ax1.text(x_right_dim + 130, mid_y, f"{int(el['height'])} (Beam)", color='black', va='center', ha='left', fontsize=10, fontweight='bold')
-            else:
-                ax1.text(x_right_dim + 130, mid_y, f"{int(el['height'])}", color='dimgray', va='center', ha='left', fontsize=9.5)
-
-        ax1.plot([col1_x, col1_x + lebar_sh], [-180, -180], 'r-', lw=1.5)
-        ax1.text(col1_x + (lebar_sh/2), -220, "Sepanjang Shaft", color='red', ha='center', va='top', fontweight='bold', fontsize=11)
-        
-        draw_rigid_border(ax1, x_min + 50, x_max - 50, y_min + 50, y_max - 50, nama_project, no_kontrak, "SEPARATOR BEAM", 1, 3, zoom_logo=0.15)
+        for b_y in beams_y:
+            x_b = 0 if config_sep == 'A' else lebar_sh - 150
+            ax1.add_patch(plt.Rectangle((x_b, b_y - 75), 150, 150, facecolor='#D3D3D3', edgecolor='blue', lw=1.2, zorder=10))
+            ax1.text(200 if config_sep == 'A' else lebar_sh - 450, b_y, f"S-Beam Y={int(b_y)}", color='blue', fontsize=8, fontweight='bold', va='center')
+            
+        draw_rigid_border(ax1, x_p1_min + 30, x_p1_max - 30, y_p1_min + 150, y_p1_max - 30, nama_project, no_kontrak, "TAMPAK DEPAN & STRUKTUR SEPARATOR", 1, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig1, dpi=300); plt.close(fig1)
-
-        # HALAMAN 2
-        fig2, ax2 = plt.subplots(figsize=(10, 12))
-        x_p2_min, x_p2_max = -500, lebar_sh + 1200
-        y_p2_min, y_p2_max = -300, elevasi_lintel + tebal_l + 500  
+        
+        # PAGE 2: POTONGAN SAMPING
+        x_p2_min, x_p2_max = -550, dalam_sh + 550
+        y_p2_min, y_p2_max = -200, total_height + 500
+        fig2, ax2 = plt.subplots(figsize=(7.5, 11))
         ax2.set_xlim(x_p2_min, x_p2_max); ax2.set_ylim(y_p2_min, y_p2_max); ax2.axis('off')
         
-        ax2.add_patch(plt.Rectangle((0, -100), lebar_sh, 100, hatch='...', facecolor='lightgray', edgecolor='black', alpha=0.6))
-        ax2.plot([0, 0], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
-        ax2.plot([lebar_sh, lebar_sh], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
-        ax2.plot([dinding_kiri, dinding_kiri], [0, elevasi_lintel], 'k-', lw=2)
-        ax2.plot([lebar_sh - dinding_kanan, lebar_sh - dinding_kanan], [0, elevasi_lintel], 'k-', lw=2)
-        ax2.plot([dinding_kiri, lebar_sh - dinding_kanan], [elevasi_lintel, elevasi_lintel], 'k-', lw=2)
+        ax2.plot([0, 0], [0, total_height], 'k-', lw=2.0)
+        ax2.plot([dalam_sh, dalam_sh], [0, total_height], 'k-', lw=2.0)
         
-        ax2.add_patch(plt.Rectangle((0, elevasi_lintel), lebar_sh, tebal_l, color='black', alpha=0.9))
-        ax2.text(lebar_sh / 2, elevasi_lintel + (tebal_l / 2), "Balok Lintel Beton Cor", color='white', ha='center', va='center', fontweight='bold', fontsize=10)
-        
-        # FIX PEMBARUAN: Mengganti inline walrus tuple operator menjadi pembagian matematika bersih kaku
-        ax2.text((dinding_kiri + lebar_sh - dinding_kanan)/2, tinggi_p/2, f"Opening Pintu Sipil (Doorway)\n{width_doorway} x {elevasi_lintel} mm\n(Bukaan Bersih Lift: {lebar_p_bersih} mm)", color='black', va='center', ha='center', fontsize=11, fontweight='bold')
-        
-        if side_tombol == "KANAN":
-            x_hole = (lebar_sh - dinding_kanan) + (dinding_kanan / 2)
-            xy_text_pos = (x_hole + 250, 1000); rad_val = -0.15
-        else:
-            x_hole = dinding_kiri / 2
-            xy_text_pos = (x_hole - 250, 1000); rad_val = 0.15
+        for idx, f_y in enumerate(floor_y_positions):
+            ax2.plot([-250, dalam_sh + 250], [f_y, f_y], 'g--', lw=1.0)
+            ax2.text(-270, f_y, f"FINISH FLOOR {idx+1}F\n(Y = {int(f_y)} mm)", color='green', ha='right', va='center', fontsize=9, fontweight='bold')
             
-        ax2.plot([x_hole - 50, x_hole + 50], [1200, 1200], 'r-', lw=1)
-        ax2.plot(x_hole, 1200, 'ko', markersize=10, fillstyle='none', lw=1.5)
-        ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=xy_text_pos,
-                     arrowprops=dict(arrowstyle="->", color="black", lw=1.2, connectionstyle=f"arc3,rad={rad_val}"),
-                     fontsize=9, color='black', fontweight='bold', ha='center', va='top')
-
-        ax2.text(dinding_kiri / 2, 150, f"Dinding Kiri:\n{int(dinding_kiri)} mm", ha='center', va='bottom', fontsize=9.5, color='blue', fontweight='bold')
-        ax2.text(lebar_sh - (dinding_kanan/2), 150, f"Dinding Kanan:\n{int(dinding_kanan)} mm", ha='center', va='bottom', fontsize=9.5, color='blue', fontweight='bold')
-
-        x_dim_baseline = lebar_sh + 150 
-        ax2.plot([lebar_sh, x_dim_baseline + 120], [0, 0], 'r-', lw=0.8)
-        ax2.plot([lebar_sh, x_dim_baseline + 120], [elevasi_lintel, elevasi_lintel], 'r-', lw=0.8)
-        ax2.plot([lebar_sh, x_dim_baseline + 120], [elevasi_lintel + tebal_l, elevasi_lintel + tebal_l], 'r-', lw=0.8)
-        ax2.plot([x_dim_baseline + 60, x_dim_baseline + 60], [0, elevasi_lintel], 'r-', lw=1.2)
-        ax2.plot([x_dim_baseline + 60, x_dim_baseline + 60], [elevasi_lintel, elevasi_lintel + tebal_l], 'r-', lw=1.2)
-        
-        ax2.text(x_dim_baseline + 90, elevasi_lintel / 2, f"{elevasi_lintel} mm (Gembosan Sipil)", color='red', va='center', ha='left', fontsize=10, fontweight='bold')
-        ax2.text(x_dim_baseline + 90, elevasi_lintel + (tebal_l / 2), f"{tebal_l} mm Lintel", color='red', va='center', ha='left', fontsize=10, fontweight='bold')
-        
-        draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 30, y_p2_max - 30, nama_project, no_kontrak, "OPENING PINTU", 2, 3, zoom_logo=0.25)
+        for b_y in beams_y:
+            ax2.add_patch(plt.Rectangle((0, b_y - 75), dalam_sh, 150, facecolor='#EAEAEA', edgecolor='blue', lw=1.2, zorder=10))
+            ax2.text(dalam_sh / 2, b_y, f"BALOK SEPARATOR MANDIRI Y={int(b_y)} mm", color='blue', fontsize=8, ha='center', va='center', fontweight='bold')
+            
+        draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 150, y_p2_max - 30, nama_project, no_kontrak, "POTONGAN SAMPING SEPARATOR BEAM", 2, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig2, dpi=300); plt.close(fig2)
-
-        # HALAMAN 3
-        fig3, ax3 = plt.subplots(figsize=(12, 13))
-        ax3.set_aspect('equal', adjustable='box')
-        x_p3_min, x_p3_max = -750, lebar_sh + 1750
-        y_p3_min, y_p3_max = -1200, dalam_sh + 1100
+        
+        # PAGE 3: TAMPAK ATAS
+        x_p3_min, x_p3_max = -550, lebar_sh + 550
+        y_p3_min, y_p3_max = -400, dalam_sh + 600
+        fig3, ax3 = plt.subplots(figsize=(7.5, 11))
         ax3.set_xlim(x_p3_min, x_p3_max); ax3.set_ylim(y_p3_min, y_p3_max); ax3.axis('off')
         
-        ax3.add_patch(plt.Rectangle((-w_wall, -w_wall), lebar_sh + (2*w_wall), dalam_sh + (2*w_wall), facecolor='none', edgecolor='black', lw=2.5))
-        ax3.add_patch(plt.Rectangle((0, 0), lebar_sh, dalam_sh, facecolor='whitesmoke', edgecolor='black', lw=1.5))
-        ax3.add_patch(plt.Rectangle((dinding_kiri, -w_wall), width_doorway, w_wall, facecolor='white', edgecolor='none'))
-        ax3.plot([dinding_kiri, dinding_kiri], [-w_wall, 0], 'k-', lw=2)
-        ax3.plot([lebar_sh - dinding_kanan, lebar_sh - dinding_kanan], [-w_wall, 0], 'k-', lw=2)
+        ax3.add_patch(plt.Rectangle((0, 0), lebar_sh, dalam_sh, facecolor='none', edgecolor='black', lw=2.5))
         
-        ax3.text(dinding_kiri / 2, -w_wall - 160, f"Dinding Kiri:\n{int(dinding_kiri)} mm", ha='center', va='top', fontsize=10, color='blue', fontweight='bold')
-        ax3.text(lebar_sh - (dinding_kanan/2), -w_wall - 140, f"Dinding Kanan:\n{int(dinding_kanan)} mm", ha='center', va='top', fontsize=10, color='blue', fontweight='bold')
-        ax3.text((dinding_kiri + lebar_sh - dinding_kanan)/2, -60, f"Lebar Pintu / Doorway: {width_doorway} mm", ha='center', va='center', fontsize=10, color='black', fontweight='bold')
-
-        plot_kiri = config_sep in ['KIRI', 'KANAN-KIRI', '3-SISI']
-        plot_kanan = config_sep in ['KANAN', 'KANAN-KIRI', '3-SISI']
-        plot_belakang = config_sep in ['BELAKANG', '3-SISI']
-            
-        if plot_kiri: ax3.add_patch(plt.Rectangle((-w_sep, 0), w_sep, dalam_sh, facecolor='black', edgecolor='black', alpha=0.8))
-        if plot_kanan: ax3.add_patch(plt.Rectangle((lebar_sh, 0), w_sep, dalam_sh, facecolor='black', edgecolor='black', alpha=0.8))
-        if plot_belakang: ax3.add_patch(plt.Rectangle((0, dalam_sh), lebar_sh, w_sep, facecolor='black', edgecolor='black', alpha=0.8))
-
-        ax3.text(-w_sep - 160, dalam_sh/2, "Balok Separator Samping (Outside)", rotation=90, va='center', ha='right', fontsize=10, fontweight='bold')
-        ax3.text(lebar_sh + w_sep + 160, dalam_sh/2, "Balok Separator Samping (Outside)", rotation=270, va='center', ha='left', fontsize=10, fontweight='bold')
-        ax3.text(lebar_sh/2, dalam_sh/2, f"CLEAR AREA SHAFT\n{lebar_sh} mm x {dalam_sh} mm", color='red', ha='center', va='center', fontweight='bold', fontsize=12)
-        ax3.text(lebar_sh/2, dalam_sh + w_sep + 150, "REKOMENDASI POSISI SEPARATOR BEAM DI LUAR CLEAR AREA", color='darkgreen', ha='center', fontweight='bold', fontsize=10)
-
-        y_dim_width = dalam_sh + w_sep + 320
-        ax3.plot([0, lebar_sh], [y_dim_width, y_dim_width], 'r-', lw=1.2)
-        ax3.plot([0, 0], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
-        ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
-        ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
+        x_b_p3 = 0 if config_sep == 'A' else lebar_sh - 150
+        ax3.add_patch(plt.Rectangle((x_b_p3, 0), 150, dalam_sh, facecolor='#D3D3D3', edgecolor='blue', lw=1.5))
+        ax3.text(x_b_p3 + 75, dalam_sh/2, "PROFIL SEPARATOR\nBEAM H-BEAM", color='blue', ha='center', va='center', rotation=90, fontsize=9, fontweight='bold')
         
-        x_dim_depth = lebar_sh + w_sep + 320
-        ax3.plot([x_dim_depth, x_dim_depth], [0, dalam_sh], 'r-', lw=1.2)
-        ax3.plot([lebar_sh, x_dim_depth + 40], [0, 0], 'r-', lw=0.6)
-        ax3.plot([lebar_sh, x_dim_depth + 40], [dalam_sh, dalam_sh], 'r-', lw=0.6)
-        ax3.text(x_dim_depth + 50, dalam_sh / 2, f"Clear Depth of Shaft:\n{dalam_sh} mm", color='red', va='center', ha='left', fontweight='bold', fontsize=11)
-
-        draw_rigid_border(ax3, x_p3_min + 30, x_p3_max - 30, y_p3_min + 150, y_p3_max - 30, nama_project, no_kontrak, "HOISTWAY", 3, 3, zoom_logo=0.25)
+        y_p_line = -220
+        ax3.plot([dinding_kiri, dinding_kiri + width_doorway], [y_p_line, y_p_line], 'b-', lw=2.0)
+        ax3.plot([dinding_kiri, dinding_kiri], [0, y_p_line - 30], 'b--', lw=0.7)
+        ax3.plot([dinding_kiri + width_doorway, dinding_kiri + width_doorway], [0, y_p_line - 30], 'b--', lw=0.7)
+        ax3.text(dinding_kiri + width_doorway/2, y_p_line - 45, f"Bobokan Gawang Pintu: {width_doorway} mm", color='blue', ha='center', va='top', fontweight='bold', fontsize=10)
+        
+        draw_rigid_border(ax3, x_p3_min + 30, x_p3_max - 30, y_p3_min + 150, y_p3_max - 30, nama_project, no_kontrak, "LAYOUT TAMPAK ATAS HOISTWAY", 3, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig3, dpi=300); plt.close(fig3)
+        
+    return pdf_buffer.getvalue()
 
-    buffer.seek(0)
-    return buffer
 
-# ==========================================
-# G3. KOLOM LOGIC ENGINE (STRUKTUR PILAR)
-# ==========================================
-def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, posisi_rel_kabin, track_gauge_cwt, tebal_rail_cwt, tebal_pintu_luar, celah_daun_pintu, tebal_kolom, lebar_p_bersih, width_doorway, tinggi_p, tinggi_gembosan, tebal_l, dinding_kiri, nama_project, no_kontrak, posisi_cwt, side_tombol):
-    buffer = io.BytesIO()
-    elevasi_lintel = tinggi_gembosan
-    dinding_kanan = lebar_sh - (dinding_kiri + width_doorway)
-    w_wall = 200 
+def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, posisi_rel_kabin,
+                   track_gauge_cwt, tebal_rail_cwt, tebal_pintu_luar, celah_daun_pintu, tebal_kolom,
+                   lebar_p_bersih, width_doorway, tinggi_p, tinggi_gembosan, tebal_l, dinding_kiri, side_tombol, nama_project, no_kontrak, posisi_cwt):
     
-    as_kabin_dari_depan = posisi_rel_kabin + celah_daun_pintu + tebal_pintu_luar
-    y_start_kabin = as_kabin_dari_depan - (tebal_kolom / 2)
-    y_end_kabin = as_kabin_dari_depan + (tebal_kolom / 2)
-    sisa_belakang_kabin = dalam_sh - y_end_kabin
-
-    as_cwt_depan = as_kabin_dari_depan - ((track_gauge_cwt / 2) + tebal_rail_cwt)
-    y_start_cwt_depan = as_cwt_depan - (tebal_kolom / 2)
-    y_end_cwt_depan = as_cwt_depan + (tebal_kolom / 2)
-
-    as_cwt_belakang = as_kabin_dari_depan + ((track_gauge_cwt / 2) + tebal_rail_cwt)
-    y_start_cwt_belakang = as_cwt_belakang - (tebal_kolom / 2)
-    y_end_cwt_belakang = as_cwt_belakang + (tebal_kolom / 2)
-
-    celah_bersih_cwt = y_start_cwt_belakang - y_end_cwt_depan
-    sisa_belakang_cwt = dalam_sh - y_end_cwt_belakang
-
-    floor_y_positions = [h_pit_bersih]
-    accumulated_y = h_pit_bersih
-    for t_val in travel_list:
-        accumulated_y += t_val
-        floor_y_positions.append(accumulated_y)
-    total_height = floor_y_positions[-1] + h_headroom
-
-    with PdfPages(buffer) as pdf:
-        # HALAMAN 1
-        fig1, ax1 = plt.subplots(figsize=(14, 22))
-        x_min, x_max = -400, (dalam_sh * 2) + 800
-        y_min, y_max = -600, total_height + 400
-        ax1.set_xlim(x_min, x_max); ax1.set_ylim(y_min, y_max); ax1.axis('off')
+    elements, total_height, floor_y_positions = generate_structural_layout(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, 3)
+    pdf_buffer = io.BytesIO()
+    
+    with PdfPages(pdf_buffer) as pdf:
+        # PAGE 1: POTONGAN DEPAN
+        x_p1_min, x_p1_max = -550, lebar_sh + 550
+        y_p1_min, y_p1_max = -200, total_height + 500
+        fig1, ax1 = plt.subplots(figsize=(7.5, 11))
+        ax1.set_xlim(x_p1_min, x_p1_max); ax1.set_ylim(y_p1_min, y_p1_max); ax1.axis('off')
         
-        x_offset_l = 0
-        ax1.plot([x_offset_l, x_offset_l], [0, total_height], 'k-', lw=2)
-        ax1.plot([x_offset_l + dalam_sh, x_offset_l + dalam_sh], [0, total_height], 'k-', lw=2)
+        ax1.plot([0, 0], [0, total_height], 'k-', lw=2.0)
+        ax1.plot([lebar_sh, lebar_sh], [0, total_height], 'k-', lw=2.0)
         
-        x_offset_r = dalam_sh + 400
-        ax1.plot([x_offset_r, x_offset_r], [0, total_height], 'k-', lw=2)
-        ax1.plot([x_offset_r + dalam_sh, x_offset_r + dalam_sh], [0, total_height], 'k-', lw=2)
-        
-        if posisi_cwt == 'L':
-            ax1.add_patch(plt.Rectangle((x_offset_l + y_start_kabin, 0), tebal_kolom, total_height, facecolor='gray', alpha=0.7, hatch='//'))
-            ax1.text(x_offset_l + dalam_sh/2, -100, "TAMPAK SAMPING SISI KIRI\n(STRUKTUR REL KABIN)", ha='center', va='top', fontsize=10, fontweight='bold')
-            ax1.add_patch(plt.Rectangle((x_offset_r + y_start_cwt_depan, 0), tebal_kolom, total_height, facecolor='gray', alpha=0.7, hatch='//'))
-            ax1.add_patch(plt.Rectangle((x_offset_r + y_start_cwt_belakang, 0), tebal_kolom, total_height, facecolor='gray', alpha=0.7, hatch='//'))
-            ax1.text(x_offset_r + dalam_sh/2, -100, "TAMPAK SAMPING SISI KANAN\n(STRUKTUR 2x SISI CWT)", ha='center', va='top', fontsize=10, fontweight='bold')
-        else:
-            ax1.add_patch(plt.Rectangle((x_offset_l + y_start_cwt_depan, 0), tebal_kolom, total_height, facecolor='gray', alpha=0.7, hatch='//'))
-            ax1.add_patch(plt.Rectangle((x_offset_l + y_start_cwt_belakang, 0), tebal_kolom, total_height, facecolor='gray', alpha=0.7, hatch='//'))
-            ax1.text(x_offset_l + dalam_sh/2, -100, "TAMPAK SAMPING SISI KIRI\n(STRUKTUR 2x SISI CWT)", ha='center', va='top', fontsize=10, fontweight='bold')
-            ax1.add_patch(plt.Rectangle((x_offset_r + y_start_kabin, 0), tebal_kolom, total_height, facecolor='gray', alpha=0.7, hatch='//'))
-            ax1.text(x_offset_r + dalam_sh/2, -100, "TAMPAK SAMPING SISI KANAN\n(STRUKTUR REL KABIN)", ha='center', va='top', fontsize=10, fontweight='bold')
-
-        ax1.plot([-50, (dalam_sh * 2) + 500], [0, 0], 'k-', lw=1.5)
-        for idx, pos in enumerate(floor_y_positions):
-            ax1.text(-70, pos, f'STOP {idx + 1}-', color='blue', va='center', ha='right', fontweight='bold', fontsize=11)
-            ax1.plot([-100, (dalam_sh * 2) + 500], [pos, pos], 'b--', lw=1)
-        ax1.text(-70, total_height, 'TOP-', color='blue', va='center', ha='right', fontweight='bold', fontsize=11)
-        ax1.plot([-100, (dalam_sh * 2) + 500], [total_height, total_height], 'b--', lw=1)
-
-        ax1.plot([-250, -250], [0, total_height], 'r-', lw=1.2)
-        ax1.text(-280, floor_y_positions[0] / 2, f"{int(floor_y_positions[0])} (PIT)", color='red', va='center', ha='right', fontweight='bold', fontsize=10)
-        for idx, travel_val in enumerate(travel_list):
-            ax1.text(-280, (floor_y_positions[idx] + floor_y_positions[idx+1])/2, f"{travel_val}", color='red', va='center', ha='right', fontweight='bold', fontsize=10)
-        ax1.text(-280, (floor_y_positions[-1] + total_height)/2, f"{int(h_headroom)} (Overhead)", color='red', va='center', ha='right', fontweight='bold', fontsize=10)
-
-        txt_orientasi = "CWT SISI KIRI" if posisi_cwt == 'K' else "CWT SISI KANAN"
-        draw_rigid_border(ax1, x_min + 50, x_max - 50, y_min + 50, y_max - 50, nama_project, no_kontrak, f"STRUKTUR LIFT ({txt_orientasi})", 1, 3, zoom_logo=0.15)
-        plt.tight_layout(); pdf.savefig(fig1, dpi=300); plt.close(fig1)
-
-        # HALAMAN 2
-        fig2, ax2 = plt.subplots(figsize=(10, 12))
-        x_p2_min, x_p2_max = -500, lebar_sh + 1200
-        y_p2_min, y_p2_max = -300, elevasi_lintel + tebal_l + 500  
-        ax2.set_xlim(x_p2_min, x_p2_max); ax2.set_ylim(y_p2_min, y_p2_max); ax2.axis('off')
-        
-        ax2.add_patch(plt.Rectangle((0, -100), lebar_sh, 100, hatch='...', facecolor='lightgray', edgecolor='black', alpha=0.6))
-        ax2.plot([0, 0], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
-        ax2.plot([lebar_sh, lebar_sh], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
-        ax2.plot([dinter_dk := dinding_kiri, dinding_kiri], [0, elevasi_lintel], 'k-', lw=2)
-        ax2.plot([lebar_sh - dinding_kanan, lebar_sh - dinding_kanan], [0, elevasi_lintel], 'k-', lw=2)
-        ax2.plot([dinter_dk, lebar_sh - dinding_kanan], [elevasi_lintel, elevasi_lintel], 'k-', lw=2)
-        
-        ax2.add_patch(plt.Rectangle((0, elevasi_lintel), lebar_sh, tebal_l, color='black', alpha=0.9))
-        ax2.text(lebar_sh / 2, elevasi_lintel + (tebal_l / 2), "Balok Lintel Beton Cor", color='white', ha='center', va='center', fontweight='bold', fontsize=10)
-        ax2.text((dinter_dk + lebar_sh - dinding_kanan)/2, tinggi_p/2, f"Opening Pintu Sipil (Doorway)\n{width_doorway} x {elevasi_lintel} mm\n(Bukaan Bersih: {lebar_p_bersih} mm)", color='black', va='center', ha='center', fontsize=11, fontweight='bold')
-        
-        if side_tombol == 'KANAN':
-            x_hole = (lebar_sh - dinding_kanan) + (dinding_kanan / 2)
-            xy_text_pos = (x_hole + 250, 1000); rad_val = -0.15
-        else:
-            x_hole = dinding_kiri / 2
-            xy_text_pos = (x_hole - 250, 1000); rad_val = 0.15
+        for idx, f_y in enumerate(floor_y_positions):
+            ax1.plot([-250, lebar_sh + 250], [f_y, f_y], 'g--', lw=1.0)
+            ax1.text(-270, f_y, f"FINISH FLOOR {idx+1}F\n(Y = {int(f_y)} mm)", color='green', ha='right', va='center', fontsize=9, fontweight='bold')
             
-        ax2.plot([x_hole - 50, x_hole + 50], [1200, 1200], 'r-', lw=1)
-        ax2.plot(x_hole, 1200, 'ko', markersize=10, fillstyle='none', lw=1.5)
-        
-        ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=xy_text_pos,
-                     arrowprops=dict(arrowstyle="->", color="black", lw=1.2, connectionstyle=f"arc3,rad={rad_val}"),
-                     fontsize=9, color='black', fontweight='bold', ha='center', va='top')
-        
-        ax2.text(dinter_dk / 2, 150, f"Dinding Kiri:\n{int(dinter_dk)} mm", ha='center', va='bottom', fontsize=9.5, color='blue', fontweight='bold')
-        ax2.text(lebar_sh - (dinding_kanan/2), 150, f"Dinding Kanan:\n{int(dinding_kanan)} mm", ha='center', va='bottom', fontsize=9.5, color='blue', fontweight='bold')
+            ax1.add_patch(plt.Rectangle((0, f_y), tebal_kolom, 300, facecolor='#A9A9A9', edgecolor='black', zorder=15))
+            ax1.add_patch(plt.Rectangle((lebar_sh - tebal_kolom, f_y), tebal_kolom, 300, facecolor='#A9A9A9', edgecolor='black', zorder=15))
+            
+            y_base_pintu = f_y
+            x_gawang_kiri = dinding_kiri
+            x_gawang_kanan = dinding_kiri + width_doorway
+            
+            ax1.plot([x_gawang_kiri, x_gawang_kiri], [y_base_pintu, y_base_pintu + tinggi_p + tinggi_gembosan], 'b-', lw=1.5)
+            ax1.plot([x_gawang_kanan, x_gawang_kanan], [y_base_pintu, y_base_pintu + tinggi_p + tinggi_gembosan], 'b-', lw=1.5)
+            ax1.plot([x_gawang_kiri, x_gawang_kanan], [y_base_pintu + tinggi_p + tinggi_gembosan, y_base_pintu + tinggi_p + tinggi_gembosan], 'b-', lw=1.5)
+            
+            y_lintel_bawah = y_base_pintu + tinggi_p + tinggi_gembosan
+            y_lintel_atas = y_lintel_bawah + tebal_l
+            ax1.add_patch(plt.Rectangle((0, y_lintel_bawah), lebar_sh, tebal_l, facecolor='#EAEAEA', edgecolor='black', lw=1.0, zorder=5))
+            
+            x_box = x_gawang_kanan + 45 if side_tombol == "KANAN" else x_gawang_kiri - 105
+            ax1.add_patch(plt.Rectangle((x_box, y_base_pintu + 1100), 60, 120, facecolor='yellow', edgecolor='black', zorder=20))
+            ax1.text(x_box + 30, y_base_pintu + 1160, "LOP", color='black', fontsize=7, ha='center', va='center', fontweight='bold')
 
-        x_dim_baseline = lebar_sh + 150 
-        ax2.plot([lebar_sh, x_dim_baseline + 120], [0, 0], 'r-', lw=0.8)
-        ax2.plot([lebar_sh, x_dim_baseline + 120], [elevasi_lintel, elevasi_lintel], 'r-', lw=0.8)
-        ax2.plot([lebar_sh, x_dim_baseline + 120], [elevasi_lintel + tebal_l, elevasi_lintel + tebal_l], 'r-', lw=0.8)
-        ax2.plot([x_dim_baseline + 60, x_dim_baseline + 60], [0, elevasi_lintel], 'r-', lw=1.2)
-        ax2.plot([x_dim_baseline + 60, x_dim_baseline + 60], [elevasi_lintel, elevasi_lintel + tebal_l], 'r-', lw=1.2)
+        draw_rigid_border(ax1, x_p1_min + 30, x_p1_max - 30, y_p1_min + 150, y_p1_max - 30, nama_project, no_kontrak, "TAMPAK FRONT ELEVATION & STRUKTUR KOLOM", 1, 3, zoom_logo=0.25)
+        plt.tight_layout(); pdf.savefig(fig1, dpi=300); plt.close(fig1)
         
-        ax2.text(x_dim_baseline + 90, elevasi_lintel / 2, f"{elevasi_lintel} mm", color='red', va='center', ha='left', fontsize=10, fontweight='bold')
-        ax2.text(x_dim_baseline + 90, elevasi_lintel + (tebal_l / 2), f"{tebal_l} mm Lintel", color='red', va='center', ha='left', fontsize=10, fontweight='bold')
+        # PAGE 2: POTONGAN SAMPING
+        fig2, ax2 = plt.subplots(figsize=(7.5, 11))
+        x_p2_min, x_p2_max = -550, dalam_sh + 550
+        y_p2_min, y_p2_max = -200, total_height + 500
+        ax2.set_xlim(x_p2_min, x_p2_max); ax2.set_ylim(y_p2_min, y_p2_max); ax2.axis('off')
+        ax2.plot([0, 0], [0, total_height], 'k-', lw=2.0)
+        ax2.plot([dalam_sh, dalam_sh], [0, total_height], 'k-', lw=2.0)
         
-        draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 30, y_p2_max - 30, nama_project, no_kontrak, "OPENING PINTU", 2, 3, zoom_logo=0.25)
+        for idx, f_y in enumerate(floor_y_positions):
+            ax2.plot([-250, dalam_sh + 250], [f_y, f_y], 'g--', lw=1.0)
+            ax2.add_patch(plt.Rectangle((0, f_y), dalam_sh, 300, facecolor='#D3D3D3', edgecolor='black', zorder=10))
+            
+        draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 150, y_p2_max - 30, nama_project, no_kontrak, "POTONGAN SAMPING STRUKTUR KOLOM COR", 2, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig2, dpi=300); plt.close(fig2)
-
-        # HALAMAN 3
-        fig3, ax3 = plt.subplots(figsize=(14, 15))
-        ax3.set_aspect('equal', adjustable='box')  
-        x_p3_min, x_p3_max = -1200, lebar_sh + 2100
-        y_p3_min, y_p3_max = -1200, dalam_sh + 1100
+        
+        # PAGE 3: TAMPAK ATAS
+        x_p3_min, x_p3_max = -550, lebar_sh + 550
+        y_p3_min, y_p3_max = -400, dalam_sh + 600
+        fig3, ax3 = plt.subplots(figsize=(7.5, 11))
         ax3.set_xlim(x_p3_min, x_p3_max); ax3.set_ylim(y_p3_min, y_p3_max); ax3.axis('off')
         
-        ax3.add_patch(plt.Rectangle((-w_wall, -w_wall), lebar_sh + (2*w_wall), dalam_sh + (2*w_wall), facecolor='none', edgecolor='black', lw=2.5))
-        ax3.add_patch(plt.Rectangle((0, 0), lebar_sh, dalam_sh, facecolor='whitesmoke', edgecolor='black', lw=1.5))
-        ax3.add_patch(plt.Rectangle((dinter_dk, -w_wall), width_doorway, w_wall, facecolor='white', edgecolor='none'))
-        ax3.plot([dinter_dk, dinter_dk], [-w_wall, 0], 'k-', lw=2)
-        ax3.plot([lebar_sh - dinding_kanan, lebar_sh - dinding_kanan], [-w_wall, 0], 'k-', lw=2)
+        ax3.add_patch(plt.Rectangle((0, 0), lebar_sh, dalam_sh, facecolor='none', edgecolor='black', lw=2.5))
+        ax3.add_patch(plt.Rectangle((0, 0), tebal_kolom, dalam_sh, facecolor='#A9A9A9', edgecolor='black'))
+        ax3.add_patch(plt.Rectangle((lebar_sh - tebal_kolom, 0), tebal_kolom, dalam_sh, facecolor='#A9A9A9', edgecolor='black'))
         
-        ax3.text(dinter_dk / 2, -w_wall - 160, f"Dinding Kiri:\n{int(dinter_dk)} mm", ha='center', va='top', fontsize=10, color='blue', fontweight='bold')
-        ax3.text(lebar_sh - (dinding_kanan/2), -w_wall - 140, f"Dinding Kanan:\n{int(dinding_kanan)} mm", ha='center', va='top', fontsize=10, color='blue', fontweight='bold')
-        ax3.text((dinter_dk + lebar_sh - dinding_kanan)/2, -60, f"Lebar Doorway: {width_doorway} mm", ha='center', va='center', fontsize=10, color='black', fontweight='bold')
-        ax3.text(lebar_sh/2, dalam_sh/2, f"CLEAR AREA SHAFT LIFT \n{lebar_sh} mm x {dalam_sh} mm", color='red', ha='center', va='center', fontweight='bold', fontsize=12)
-
-        x_l1, x_l2 = -260, -550     
-        x_r1, x_r2 = lebar_sh + tebal_kolom + 260, lebar_sh + tebal_kolom + 580 
-
-        if posisi_cwt == 'L':
-            ax3.add_patch(plt.Rectangle((-tebal_kolom, y_start_kabin), tebal_kolom, tebal_kolom, facecolor='black', edgecolor='black'))
-            ax3.add_patch(plt.Rectangle((lebar_sh, y_start_cwt_depan), tebal_kolom, tebal_kolom, facecolor='black', edgecolor='black'))
-            ax3.add_patch(plt.Rectangle((lebar_sh, y_start_cwt_belakang), tebal_kolom, tebal_kolom, facecolor='black', edgecolor='black'))
-            
-            ax3.plot([0, x_l2], [0, 0], 'r-', lw=0.5); ax3.plot([0, x_l1], [y_start_kabin, y_start_kabin], 'r-', lw=0.5)
-            ax3.plot([0, x_l1], [y_end_kabin, y_end_kabin], 'r-', lw=0.5); ax3.plot([0, x_l2], [dalam_sh, dalam_sh], 'r-', lw=0.5)
-            ax3.plot([x_l1, x_l1], [0, dalam_sh], 'r-', lw=1); ax3.plot([x_l2, x_l2], [0, dalam_sh], 'r-', lw=1)
-            
-            ax3.text(x_l1 + 35, y_start_kabin / 2, f"{int(y_start_kabin)} mm", color='red', va='center', ha='left', fontweight='bold', fontsize=9.5)
-            ax3.text(x_l1 - 35, (y_start_kabin + y_end_kabin)/2, f"{tebal_kolom} mm\n(Kolom Kiri)", color='black', va='center', ha='right', fontweight='bold', fontsize=9)
-            ax3.text(x_l1 + 35, y_end_kabin + (sisa_belakang_kabin/2), f"{int(sisa_belakang_kabin)} mm", color='red', va='center', ha='left', fontweight='bold', fontsize=9.5)
-            
-            ax3.plot([lebar_sh, x_r2], [0, 0], 'r-', lw=0.5); ax3.plot([lebar_sh, x_r1], [y_start_cwt_depan, y_start_cwt_depan], 'r-', lw=0.5)
-            ax3.plot([lebar_sh, x_r1], [y_end_cwt_depan, y_end_cwt_depan], 'r-', lw=0.5); ax3.plot([lebar_sh, x_r1], [y_start_cwt_belakang, y_start_cwt_belakang], 'r-', lw=0.5)
-            ax3.plot([lebar_sh, x_r1], [y_end_cwt_belakang, y_end_cwt_belakang], 'r-', lw=0.5); ax3.plot([lebar_sh, x_r2], [dalam_sh, dalam_sh], 'r-', lw=0.5)
-            ax3.plot([x_r1, x_r1], [0, dalam_sh], 'r-', lw=1); ax3.plot([x_r2, x_r2], [0, dalam_sh], 'r-', lw=1)
-            
-            ax3.text(x_r1 - 35, y_start_cwt_depan / 2, f"{int(y_start_cwt_depan)} mm\n(Sisa Depan)", color='red', va='center', ha='right', fontweight='bold', fontsize=9.5)
-            ax3.text(x_r1 + 35, (y_start_cwt_depan + y_end_cwt_depan)/2, f"{tebal_kolom} mm\n(Kolom CWT 1)", color='black', va='center', ha='left', fontsize=8.5, fontweight='bold')
-            ax3.text(x_r1 - 35, (y_end_cwt_depan + y_start_cwt_belakang)/2, f"{int(celah_bersih_cwt)} mm\n(Celah Tengah)", color='darkgreen', va='center', ha='right', fontweight='bold', fontsize=9.5)
-            ax3.text(x_r1 + 35, (y_start_cwt_belakang + y_end_cwt_belakang)/2, f"{tebal_kolom} mm\n(Kolom CWT 2)", color='black', va='center', ha='left', fontsize=8.5, fontweight='bold')
-            ax3.text(x_r1 - 35, y_end_cwt_belakang + (sisa_belakang_cwt/2), f"{int(sisa_belakang_cwt)} mm\n(Sisa Belakang)", color='red', va='center', ha='right', fontweight='bold', fontsize=9.5)
-            
-            ax3.text(x_l2 - 45, dalam_sh / 2, f"Clear Depth: {dalam_sh} mm", color='darkred', va='center', ha='right', fontweight='bold', fontsize=10)
-            ax3.text(x_r2 + 45, dalam_sh / 2, f"Clear Depth:\n{dalam_sh} mm", color='darkred', va='center', ha='left', fontweight='bold', fontsize=10)
-        else:
-            ax3.add_patch(plt.Rectangle((-tebal_kolom, y_start_cwt_depan), tebal_kolom, tebal_kolom, facecolor='black', edgecolor='black'))
-            ax3.add_patch(plt.Rectangle((-tebal_kolom, y_start_cwt_belakang), tebal_kolom, tebal_kolom, facecolor='black', edgecolor='black'))
-            ax3.add_patch(plt.Rectangle((lebar_sh, y_start_kabin), tebal_kolom, tebal_kolom, facecolor='black', edgecolor='black'))
-            
-            ax3.plot([0, x_l2], [0, 0], 'r-', lw=0.5); ax3.plot([0, x_l1], [y_start_cwt_depan, y_start_cwt_depan], 'r-', lw=0.5)
-            ax3.plot([0, x_l1], [y_end_cwt_depan, y_end_cwt_depan], 'r-', lw=0.5); ax3.plot([0, x_l1], [y_start_cwt_belakang, y_start_cwt_belakang], 'r-', lw=0.5)
-            ax3.plot([0, x_l1], [y_end_cwt_belakang, y_end_cwt_belakang], 'r-', lw=0.5); ax3.plot([0, x_l2], [dalam_sh, dalam_sh], 'r-', lw=0.5)
-            ax3.plot([x_l1, x_l1], [0, dalam_sh], 'r-', lw=1); ax3.plot([x_l2, x_l2], [0, dalam_sh], 'r-', lw=1)
-            
-            ax3.text(x_l1 + 35, y_start_cwt_depan / 2, f"{int(y_start_cwt_depan)} mm\n(Sisa Depan)", color='red', va='center', ha='left', fontweight='bold', fontsize=9.5)
-            ax3.text(x_l1 - 35, (y_start_cwt_depan + y_end_cwt_depan)/2, f"{tebal_kolom} mm\n(Kolom CWT 1)", color='black', va='center', ha='right', fontsize=8.5, fontweight='bold')
-            ax3.text(x_l1 + 35, (y_end_cwt_depan + y_start_cwt_belakang)/2, f"{int(celah_bersih_cwt)} mm\n(Celah Tengah)", color='darkgreen', va='center', ha='left', fontweight='bold', fontsize=9.5)
-            ax3.text(x_l1 - 35, (y_start_cwt_belakang + y_end_cwt_belakang)/2, f"{tebal_kolom} mm\n(Kolom CWT 2)", color='black', va='center', ha='right', fontsize=8.5, fontweight='bold')
-            ax3.text(x_l1 + 35, y_end_cwt_belakang + (sisa_belakang_cwt/2), f"{int(sisa_belakang_cwt)} mm\n(Sisa Belakang)", color='red', va='center', ha='left', fontweight='bold', fontsize=9.5)
-            
-            ax3.plot([lebar_sh, x_r2], [0, 0], 'r-', lw=0.5); ax3.plot([lebar_sh, x_r1], [y_start_kabin, y_start_kabin], 'r-', lw=0.5)
-            ax3.plot([lebar_sh, x_r1], [y_end_kabin, y_end_kabin], 'r-', lw=0.5); ax3.plot([lebar_sh, x_r2], [dalam_sh, dalam_sh], 'r-', lw=0.5)
-            ax3.plot([x_r1, x_r1], [0, dalam_sh], 'r-', lw=1); ax3.plot([x_r2, x_r2], [0, dalam_sh], 'r-', lw=1)
-            
-            ax3.text(x_r1 - 35, y_start_kabin / 2, f"{int(y_start_kabin)} mm", color='red', va='center', ha='right', fontweight='bold', fontsize=9.5)
-            ax3.text(x_r1 + 35, (y_start_kabin + y_end_kabin)/2, f"{tebal_kolom} mm\n(Kolom Kanan)", color='black', va='center', ha='left', fontweight='bold', fontsize=9)
-            ax3.text(x_r1 - 35, y_end_kabin + (sisa_belakang_kabin/2), f"{int(sisa_belakang_kabin)} mm", color='red', va='center', ha='right', fontweight='bold', fontsize=9.5)
-            
-            ax3.text(x_l2 - 45, dalam_sh / 2, f"Clear Depth  Shaft: {dalam_sh} mm", color='darkred', va='center', ha='right', fontweight='bold', fontsize=10)
-            ax3.text(x_r2 + 45, dalam_sh / 2, f"Clear Depth:\n{dalam_sh} mm", color='darkred', va='center', ha='left', fontweight='bold', fontsize=10)
-
-
-        y_w_line = dalam_sh + 320
-        ax3.plot([0, lebar_sh], [y_w_line, y_w_line], 'r-', lw=1.2)
-        ax3.plot([0, 0], [dalam_sh, y_w_line + 40], 'r-', lw=0.6)
-        ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_w_line + 40], 'r-', lw=0.6)
-        ax3.text(lebar_sh / 2, y_w_line + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
-
-        txt_title = "HOISTWAY"
-        draw_rigid_border(ax3, x_p3_min + 30, x_p3_max - 30, y_p3_min + 150, y_p3_max - 30, nama_project, no_kontrak, txt_title, 3, 3, zoom_logo=0.25)
+        x_cwt_box = 40 if posisi_cwt == 'K' else lebar_sh - 40 - track_gauge_cwt
+        ax3.add_patch(plt.Rectangle((x_cwt_box, dalam_sh/2 - 100), track_gauge_cwt, 200, facecolor='none', edgecolor='black', lw=1.5))
+        
+        draw_rigid_border(ax3, x_p3_min + 30, x_p3_max - 30, y_p3_min + 150, y_p3_max - 30, nama_project, no_kontrak, "LAYOUT TAMPAK ATAS HOISTWAY", 3, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig3, dpi=300); plt.close(fig3)
+        
+    return pdf_buffer.getvalue()
 
-    buffer.seek(0)
-    return buffer
 
-# ==========================================
-# 4. EXECUTOR CONTROLLER (STREAMLIT INTERFACE WEB)
-# ==========================================
-st.title("Franz Lift Shop Drawing Generator")
-st.markdown("Aplikasi Otomatisasi Gambar Kerja Sipil Penempatan Separator Beam & Kolom Struktur Utama Lift by RDP.")
+# =========================================================================
+# G5. CONTROLLER INTERFACE TAB NAVIGATION
+# =========================================================================
+st.title("⚙️ Franz Lift Shop Drawing Generator")
+st.markdown("Aplikasi Otomatisasi Gambar Kerja Sipil Penempatan Separator Beam & Kolom Struktur Utama Lift.")
 st.write("---")
 
-tab_balok, tab_kolom = st.tabs(["1. Opsi Balok Separator Beam", "2. Opsi Tiang Kolom Struktur"])
+tab_balok, tab_kolom = st.tabs(["🏗️ 1. Opsi Balok Separator Beam", "🏛️ 2. Opsi Tiang Kolom Struktur"])
 
 with tab_balok:
     st.header("Konfigurasi Gambar Kerja Balok Separator Samping")
@@ -509,47 +406,62 @@ with tab_balok:
     
     with col1:
         st.subheader("Parameter Proyek & Sipil")
-        b_nama_project = st.text_input("Nama Proyek / Klien:", "GUNAWAN-JKT", key="b_proj")
-        b_no_kontrak = st.text_input("Nomor Gambar Kerja:", " ", key="b_kontrak")
+        b_project_name = st.text_input("Nama Proyek / Klien:", value=st.session_state.b_project_name, key="b_proj_input")
+        b_contract_no = st.text_input("Nomor Gambar Kerja / Kontrak Requisition:", value=st.session_state.b_contract_no, key="b_cont_input")
+        b_config_sep = st.radio("Penempatan Posisi Sisi Balok Separator:", ["KIRI", "KANAN"], horizontal=True)
+
+    with col2:
+        st.subheader("Dimensi Hoistway Bersih (mm)")
+        b_w_sh = st.number_input("Lebar Ruang Shaft Lift (Clear Width):", value=st.session_state.b_w_sh, step=50)
+        b_d_sh = st.number_input("Kedalaman Ruang Shaft Lift (Clear Depth):", value=st.session_state.b_d_sh, step=50)
+        b_p_h = st.number_input("Kedalaman Batas PIT Lift:", value=st.session_state.b_p_h, step=50)
+        b_hr_h = st.number_input("Tinggi Ruang Atas Headroom Lantai Top:", value=st.session_state.b_hr_h, step=50)
+
+    with col3:
+        st.subheader("Dimensi Lantai & Bukaan Gawang Sipil")
+        b_f_num = st.number_input("Jumlah Lantai Berhenti:", min_value=2, max_value=12, value=st.session_state.b_f_num)
+        b_tr_str = st.text_input("Jarak Lantai / Travel List (mm, pisahkan dengan koma):", value=st.session_state.b_tr_str)
         
-        b_lebar_sh = st.number_input("Lebar Area Lift / Hoistway (mm):", value=1700, key="b_w")
-        b_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway (mm):", value=1500, key="b_d")
-        b_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=170, key="b_pit")
-        b_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=3000, key="b_hr")
-        
-        st.subheader("Data Lantai & Travel")
-        b_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=3, key="b_floors")
-        b_travel_list = []
-        for i in range(1, b_jml_lantai):
-            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"b_t_{i}")
-            b_travel_list.append(t_val)
+        try:
+            b_travel_list = [int(x.strip()) for x in b_tr_str.split(",")]
+        except:
+            b_travel_list = [3500] * (b_f_num - 1)
             
-        st.subheader("Dimensi Gawang & Penempatan")
-        b_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=800, key="b_pw")
-        b_width_doorway = st.number_input("Lebar Kongleong Opening Sipil (mm):", value=950, key="b_dw")
-        b_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=2000, key="b_ph")
-        b_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang (mm):", value=2100, key="b_gh")
-        b_tebal_l = st.number_input("Tebal Balok Cor Gawang Pintu (mm):", value=300, key="b_lt")
-        b_dinding_kiri = st.number_input("Jarak Dinding Kiri ke Tepi Doorway (mm):", value=375, key="b_lwall")
-        b_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Balok):", ["KANAN", "KIRI"], horizontal=True, key="b_side_btn")
-        b_config_sep = st.selectbox("Pilihan Konfigurasi Separator Beam:", ['3-SISI', 'KANAN-KIRI', 'KIRI', 'KANAN', 'BELAKANG'], key="b_cfg")
+        b_cw_door = st.number_input("Lebar Bukaan Pintu Bersih (Clear Opening):", value=st.session_state.b_cw_door)
+        b_dw_door = st.number_input("Lebar Bobokan Gawang Pintu (Doorway Opening):", value=st.session_state.b_dw_door)
+        b_ph_door = st.number_input("Tinggi Opening Pintu Bersih:", value=st.session_state.b_ph_door)
+        b_gh_door = st.number_input("Total Tinggi Gembosan Sipil Gawang Pintu:", value=st.session_state.b_gh_door)
+        b_lt_thick = st.number_input("Tebal Balok Cor Lintel di atas pintu:", value=st.session_state.b_lt_thick)
+        b_lwall_dis = st.number_input("Jarak asimetris dinding kiri KUPINGAN OPENING:", value=st.session_state.b_lwall_dis)
 
     with col2:
         st.subheader("Preview Dokumen Cetak Biru Resmi")
-        elements, t_total, floor_y_positions = generate_structural_layout(b_lebar_sh, b_dalam_sh, b_h_pit, b_h_headroom, b_travel_list)
         
-        balok_pdf_data = make_balok_pdf(
-            elements, b_lebar_sh, b_dalam_sh, t_total, b_travel_list, floor_y_positions, b_h_headroom,
-            b_lebar_p, b_width_doorway, b_tinggi_p, b_tinggi_gembosan, b_tebal_l, b_dinding_kiri, b_config_sep, b_nama_project, b_no_kontrak, b_side_tombol
+        # Eksekusi Render Gambar PDF Langsung ke Memori Server
+        sep_pdf_data = make_separator_pdf(
+            b_w_sh, b_d_sh, b_p_h, b_hr_h, b_travel_list, b_f_num,
+            b_cw_door, b_dw_door, b_ph_door, b_gh_door, b_lt_thick, b_lwall_dis,
+            ('A' if b_config_sep == "KIRI" else 'B'), b_project_name, b_contract_no
         )
         
-        st.success(f"Gambar Kerja Resmi Untuk {b_nama_project} Berhasil Di-kalkulasi.")
+        # Kirim data parameter ke baris baru Google Sheets Cloud
+        payload_a = {
+            "nama_project": b_project_name, "no_drawing": b_contract_no, "tipe_modul": "Separator Beam",
+            "lebar_hoistway": b_w_sh, "dalam_hoistway": b_d_sh, "kedalaman_pit": b_p_h, "tinggi_headroom": b_hr_h,
+            "jml_lantai": b_f_num, "travel_list_str": b_tr_str, "lebar_pintu_bersih": b_cw_door, "lebar_bobokan_gawang": b_dw_door,
+            "tinggi_pintu_bersih": b_ph_door, "total_tinggi_gembosan": b_gh_door, "tebal_balok_lintel": b_lt_thick, "jarak_kupingan_kiri": b_lwall_dis
+        }
+        
+        st.success(f"Gambar Kerja Resmi Untuk {b_project_name} Berhasil Di-kalkulasi.")
         st.download_button(
-            label="💾 Unduh Gambar Kerja Resmi Balok Separator (PDF)",
-            data=balok_pdf_data,
-            file_name=f"Shop_Drawing_{b_nama_project.replace(' ', '_')}_Separator_Beam.pdf",
+            label="💾 Unduh Gambar Kerja Resmi Balok Separator (PDF)", 
+            data=sep_pdf_data, 
+            file_name=f"Shop_Drawing_{b_project_name.replace(' ', '_')}_Separator_Beam.pdf", 
             mime="application/pdf"
         )
+        
+        if st.button("💾 Simpan Log Parameter ke Google Sheets", key="save_sep"):
+            append_history_to_sheets(payload_a)
 
 with tab_kolom:
     st.header("Konfigurasi Gambar Kerja Pilar / Kolom Struktur Utama Vertikal")
@@ -557,53 +469,66 @@ with tab_kolom:
     
     with col1:
         st.subheader("Parameter Proyek & Sipil")
-        k_nama_project = st.text_input("Nama Proyek / Klien:", "GUNAWAN-JKT", key="k_proj")
-        k_no_kontrak = st.text_input("Nomor Gambar Kerja:", " ", key="k_kontrak")
-        k_posisi_cwt = st.radio("Posisi Penempatan CWT Mekanikal:", ["L (KANAN LAYOUT)", "K (KIRI LAYOUT)"], horizontal=True, key="k_cwt_pos")
+        k_project_name = st.text_input("Nama Proyek / Klien :", value=st.session_state.k_project_name, key="k_proj_input")
+        k_contract_no = st.text_input("Nomor Gambar Kerja / Kontrak Requisition :", value=st.session_state.k_contract_no, key="k_cont_input")
+        k_posisi_cwt = st.radio("Penempatan Posisi Sisi Mekanikal CWT Lift:", ["KIRI", "KANAN"], horizontal=True, key="k_cwt_side")
         cwt_char = k_posisi_cwt[0]
-        
-        k_lebar_sh = st.number_input("Lebar Area Lift / Hoistway Luar Murni (mm):", value=1430, key="k_w")
-        k_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway Luar Murni (mm):", value=1430, key="k_d")
-        k_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=170, key="k_pit")
-        k_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=3000, key="k_hr")
-        
-        st.subheader("Data Lantai & Elevasi")
-        k_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=3, key="k_floors")
-        k_travel_list = []
-        for i in range(1, k_jml_lantai):
-            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"k_t_{i}")
-            k_travel_list.append(t_val)
-            
-        st.subheader("Parameter Mekanikal Rel Kunci")
-        k_posisi_rel_kabin = st.number_input("Jarak AS REL Kabin ke bibir depan car / kabin (mm):", value=670, key="k_rail_pos")
-        k_track_gauge_cwt = st.number_input("Jarak antar rel CWT / Secondary Track Gauge (mm):", value=700, key="k_stg")
-        k_tebal_rail_cwt = st.number_input("Ketebalan fisik profil rel CWT (mm):", value=60, key="k_tr")
-        k_tebal_pintu_luar = st.number_input("Ketebalan mekanisme pintu luar (mm):", value=110, key="k_out_door")
-        k_celah_daun_pintu = st.number_input("Celah bebas ruang gerak pintu / clearance (mm):", value=30, key="k_pclear")
-        k_tebal_kolom = st.number_input("Ketebalan/Dimensi Kolom Struktur Yang Diinginkan (mm):", value=200, key="k_tk")
 
-        st.subheader("Dimensi Gawang Opening Depan")
-        k_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=800, key="k_pw_col")
-        k_width_doorway = st.number_input("Lebar Kongleong Sipil Opening (mm):", value=950, key="k_dw_col")
-        k_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=2000, key="k_ph_col")
-        k_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang Pintu (mm):", value=2100, key="k_gh_col")
-        k_tebal_l = st.number_input("Tebal Balok Cor Lintel di atas pintu (mm):", value=300, key="k_lt_col")
-        k_dinding_kiri = st.number_input("Jarak asimetris dinding kiri KUPINGAN OPENING (mm):", value=400, key="k_lwall_col")
-        k_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Kolom):", ["KANAN", "KIRI"], horizontal=True, key="k_side_btn")
+        st.subheader("Dimensi Hoistway & Internal Rail Mekanikal (mm)")
+        k_w_sh = st.number_input("Lebar Ruang Shaft Lift (Clear Width) :", value=st.session_state.k_w_sh, step=50, key="k_w_sh_inp")
+        k_d_sh = st.number_input("Kedalaman Ruang Shaft Lift (Clear Depth) :", value=st.session_state.k_d_sh, step=50, key="k_d_sh_inp")
+        k_p_h = st.number_input("Kedalaman Batas PIT Lift :", value=st.session_state.k_p_h, step=50, key="k_p_h_inp")
+        k_hr_h = st.number_input("Tinggi Ruang Atas Headroom Lantai Top :", value=st.session_state.k_hr_h, step=50, key="k_hr_h_inp")
+        k_rel_pos = st.number_input("As Jarak Posisi Center Rel Kabin:", value=st.session_state.k_rel_pos, key="k_rel_inp")
+        k_tg_cwt = st.number_input("Track Gauge CWT Mekanikal (mm):", value=st.session_state.k_tg_cwt, key="k_tg_inp")
+        k_th_cwt = st.number_input("Ketebalan Ukuran Profil Rail CWT:", value=st.session_state.k_th_cwt, key="k_th_cwt_inp")
+        k_th_door = st.number_input("Tebal Profil Pintu Luar (Front Door Mech):", value=st.session_state.k_th_door, key="k_th_door_inp")
+        k_gap_door = st.number_input("Celah Toleransi Bebas Daun Pintu (Clearance):", value=st.session_state.k_gap_door, key="k_gap_inp")
+        k_th_col = st.number_input("Ketebalan Profil Ukuran Baja Kolom UNP Utama:", value=st.session_state.k_th_col, key="k_th_col_inp")
+
+        st.subheader("Dimensi Elevasi Lantai & Bukaan Pintu")
+        k_f_num = st.number_input("Jumlah Lantai Berhenti :", min_value=2, max_value=12, value=st.session_state.k_f_num, key="k_f_num_inp")
+        k_tr_str = st.text_input("Jarak Lantai / Travel List (mm, pisahkan dengan koma) :", value=st.session_state.k_tr_str, key="k_tr_inp")
+        
+        try:
+            k_travel_list = [int(x.strip()) for x in k_tr_str.split(",")]
+        except:
+            k_travel_list = [3500] * (k_f_num - 1)
+            
+        k_cw_door = st.number_input("Lebar Bukaan Pintu Bersih (Clear Opening) :", value=st.session_state.k_cw_door, key="k_cw_inp")
+        k_dw_door = st.number_input("Lebar Bobokan Gawang Pintu (Doorway Opening) :", value=st.session_state.k_dw_door, key="k_dw_inp")
+        k_ph_door = st.number_input("Tinggi Opening Pintu Bersih :", value=st.session_state.k_ph_door, key="k_ph_inp")
+        k_gh_door = st.number_input("Total Tinggi Gembosan Sipil Gawang Pintu :", value=st.session_state.k_gh_door, key="k_gh_inp")
+        k_lt_thick = st.number_input("Tebal Balok Cor Lintel di atas pintu :", value=st.session_state.k_lt_thick, key="k_lt_inp")
+        k_lwall_dis = st.number_input("Jarak asimetris dinding kiri KUPINGAN OPENING :", value=st.session_state.k_lwall_dis, key="k_lw_inp")
+        k_side_tombol = st.radio("Penempatan Sisi Kotak Tombol LOP Pintu:", ["KANAN", "KIRI"], horizontal=True)
 
     with col2:
         st.subheader("Preview Dokumen Cetak Biru Resmi")
         
         kolom_pdf_data = make_kolom_pdf(
-            k_lebar_sh, k_dalam_sh, k_h_pit, k_h_headroom, k_travel_list, k_posisi_rel_kabin,
-            k_track_gauge_cwt, k_tebal_rail_cwt, k_tebal_pintu_luar, k_celah_daun_pintu, k_tebal_kolom,
-            k_lebar_p, k_width_doorway, k_tinggi_p, k_tinggi_gembosan, k_tebal_l, k_dinding_kiri, k_nama_project, k_no_kontrak, cwt_char, k_side_tombol
+            k_w_sh, k_d_sh, k_p_h, k_hr_h, k_travel_list, k_rel_pos, k_tg_cwt, k_th_cwt,
+            k_th_door, k_gap_door, k_th_col, k_cw_door, k_dw_door, k_ph_door, k_gh_door,
+            k_lt_thick, k_lwall_dis, k_side_tombol, k_project_name, k_contract_no,
+            ('K' if k_posisi_cwt == "KIRI" else 'L')
         )
         
-        st.success(f"Gambar Kerja Resmi Tiang Kolom Struktur Untuk {k_nama_project} Berhasil Di-kalkulasi.")
+        # Kirim data parameter ke baris baru Google Sheets Cloud
+        payload_b = {
+            "nama_project": k_project_name, "no_drawing": k_contract_no, "tipe_modul": "Column Structure",
+            "lebar_hoistway": k_w_sh, "dalam_hoistway": k_d_sh, "kedalaman_pit": k_p_h, "tinggi_headroom": k_hr_h,
+            "jml_lantai": k_f_num, "travel_list_str": k_tr_str, "lebar_pintu_bersih": k_cw_door, "lebar_bobokan_gawang": k_dw_door,
+            "tinggi_pintu_bersih": k_ph_door, "total_tinggi_gembosan": k_gh_door, "tebal_balok_lintel": k_lt_thick, "jarak_kupingan_kiri": k_lwall_dis,
+            "as_rel_kabin": k_rel_pos, "track_gauge_cwt": k_tg_cwt, "tebal_rail_cwt": k_th_cwt, "tebal_pintu_luar": k_th_door, "celah_daun_pintu": k_gap_door, "tebal_kolom_unp": k_th_col
+        }
+        
+        st.success(f"Gambar Kerja Resmi Tiang Kolom Struktur Untuk {k_project_name} Berhasil Di-kalkulasi.")
         st.download_button(
-            label="💾 Unduh Gambar Kerja Resmi Kolom Struktur (PDF)",
-            data=kolom_pdf_data,
-            file_name=f"Shop_Drawing_{k_nama_project.replace(' ', '_')}_Struktur_Kolom.pdf",
+            label="💾 Unduh Gambar Kerja Resmi Kolom Struktur (PDF)", 
+            data=kolom_pdf_data, 
+            file_name=f"Shop_Drawing_{k_project_name.replace(' ', '_')}_Struktur_Kolom.pdf", 
             mime="application/pdf"
         )
+        
+        if st.button("💾 Simpan Log Parameter ke Google Sheets", key="save_col"):
+            append_history_to_sheets(payload_b)
