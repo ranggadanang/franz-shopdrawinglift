@@ -13,11 +13,11 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Franz Lift Drawing Generator", layout="wide", page_icon="⚙️")
 
 # =========================================================================
-# G1. INITIALIZATION: CONNECTOR GOOGLE SHEETS & RECALL STATE
+# G1. CONFIG: INITIALIZATION GOOGLE SHEETS & RECALL SESSION STATE SYSTEM
 # =========================================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Amankan penampung variabel memori agar tidak hilang/eror saat auto-fill dipicu
+# Daftar kunci utama penyimpanan data hasil recall dari cloud gsheets
 state_keys = [
     "b_nama_project", "b_no_kontrak", "b_lebar_sh", "b_dalam_sh", "b_h_pit", "b_h_headroom", "b_jml_lantai",
     "b_lebar_p", "b_width_doorway", "b_tinggi_p", "b_tinggi_gembosan", "b_tebal_l", "b_dinding_kiri",
@@ -27,7 +27,7 @@ state_keys = [
     "k_lebar_p", "k_width_doorway", "k_tinggi_p", "k_tinggi_gembosan", "k_tebal_l", "k_dinding_kiri", "k_side_tombol"
 ]
 
-# Set nilai default murni bawaan program asli jika session masih kosong
+# Set nilai default murni bawaan program asli jika session masih kosong saat pertama kali dibuka
 for k in state_keys:
     if k not in st.session_state:
         if "nama" in k or "proj" in k: st.session_state[k] = "GUNAWAN-JKT"
@@ -39,7 +39,7 @@ for k in state_keys:
         elif "lebar_sh" in k or "b_w" in k: st.session_state[k] = 1700 if "b_" in k else 1430
         elif "dalam_sh" in k or "b_d" in k: st.session_state[k] = 1500 if "b_" in k else 1430
         elif "h_pit" in k or "pit" in k: st.session_state[k] = 170
-        elif "headroom" in k or "b_hr" in k or "k_hr" in k: st.session_state[k] = 3000 if "b_" in k else 3000
+        elif "headroom" in k or "b_hr" in k or "k_hr" in k: st.session_state[k] = 3000
         elif "lebar_p" in k or "pw" in k: st.session_state[k] = 800
         elif "width_doorway" in k or "dw" in k: st.session_state[k] = 950
         elif "tinggi_p" in k or "ph" in k: st.session_state[k] = 2000
@@ -61,7 +61,7 @@ if os.path.exists("logo.png"):
 st.sidebar.markdown("### 📋 Panggil Riwayat Proyek")
 
 try:
-    df_history = conn.read(ttl="10s")
+    df_history = conn.read(ttl="5s") # cache diturunkan ke 5 detik agar responsif luar biasa
     if df_history is not None and not df_history.empty:
         df_history['label_select'] = df_history['nama_project'].astype(str) + " (" + df_history['no_drawing'].astype(str) + ") [" + df_history['tipe_modul'].astype(str) + "]"
         options_list = ["-- Pilih Data Untuk Auto-Fill --"] + df_history['label_select'].tolist()
@@ -73,6 +73,7 @@ try:
             tipe = row['tipe_modul']
             st.sidebar.success(f"Berhasil memuat tipe: {tipe}")
             
+            # AMAN SINKRON: Mengisi penampung data utama tanpa tabrakan dengan widget utama
             if tipe == "Separator Beam":
                 st.session_state.b_nama_project = str(row.get('nama_project', 'GUNAWAN-JKT'))
                 st.session_state.b_no_kontrak = str(row.get('no_drawing', ' '))
@@ -125,7 +126,7 @@ def push_history_to_sheets(payload):
         else:
             df_merged = df_new
         conn.update(data=df_merged)
-        st.success("✨ Nilat parameter sukses dicatat permanen ke Cloud Database!")
+        st.success("✨ Nilai parameter sukses dicatat permanen ke Cloud Database!")
     except:
         st.warning("Catatan: Data gagal dikirim ke Google Sheets, periksa konfigurasi 'Secrets' Anda.")
 
@@ -175,8 +176,8 @@ def draw_rigid_border(ax, x_min, x_max, y_min, y_max, project_name, contract_no,
     ax.text(x_c2 + 20, y_kop_start + (h_kop * 0.68), "DRAWING TITLE :", color='dimgray', va='center', ha='left', fontsize=8, zorder=103)
     ax.text(x_c2 + 20, y_kop_start + (h_kop * 0.32), page_title, color='black', fontweight='bold', va='center', ha='left', fontsize=9, zorder=103)
     
-    ax.text(x_c3 + 20, y_kop_start + (h_kop * 0.65), "DESIGNED BY: RDP", color='black', va='center', ha='left', fontsize=8, zorder=103)
-    ax.text(x_c3 + 20, y_kop_start + (h_kop * 0.30), f"PAGE : {page_num} OF {total_pages}", color='blue', fontweight='bold', va='center', ha='left', fontsize=9.5, zorder=103)
+    ax.text(x_c3 + 20, y_kop_start + (h_kop * 0.30), "DESIGNED BY: RDP", color='black', va='center', ha='left', fontsize=8, zorder=103)
+    ax.text(x_c3 + 20, y_kop_start + (h_kop * 0.15), f"PAGE : {page_num} OF {total_pages}", color='blue', fontweight='bold', va='center', ha='left', fontsize=9.5, zorder=103)
 
 # ==========================================
 # G4. BALOK LOGIC ENGINE (SEPARATOR BEAM) (ASLI)
@@ -329,7 +330,7 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
             
         ax2.plot([x_hole - 50, x_hole + 50], [1200, 1200], 'r-', lw=1)
         ax2.plot(x_hole, 1200, 'ko', markersize=10, fillstyle='none', lw=1.5)
-        ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=xy_text_pos,
+        ax2.annotate(f"Lubang Kabel\nTombol Pintu Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=(xy_text_pos, 1000),
                      arrowprops=dict(arrowstyle="->", color="black", lw=1.2, connectionstyle=f"arc3,rad={rad_val}"),
                      fontsize=9, color='black', fontweight='bold', ha='center', va='top')
 
@@ -358,13 +359,13 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         
         ax3.add_patch(plt.Rectangle((-w_wall, -w_wall), lebar_sh + (2*w_wall), dalam_sh + (2*w_wall), facecolor='none', edgecolor='black', lw=2.5))
         ax3.add_patch(plt.Rectangle((0, 0), lebar_sh, dalam_sh, facecolor='whitesmoke', edgecolor='black', lw=1.5))
-        ax3.add_patch(plt.Rectangle((dinding_kiri, -w_wall), width_doorway, w_wall, facecolor='white', edgecolor='none'))
-        ax3.plot([dinding_kiri, dinding_kiri], [-w_wall, 0], 'k-', lw=2)
+        ax3.add_patch(plt.Rectangle((dinter_dk, -w_wall), width_doorway, w_wall, facecolor='white', edgecolor='none'))
+        ax3.plot([dinter_dk, dinter_dk], [-w_wall, 0], 'k-', lw=2)
         ax3.plot([lebar_sh - dinding_kanan, lebar_sh - dinding_kanan], [-w_wall, 0], 'k-', lw=2)
         
-        ax3.text(dinding_kiri / 2, -w_wall - 160, f"Dinding Kiri:\n{int(dinding_kiri)} mm", ha='center', va='top', fontsize=10, color='blue', fontweight='bold')
+        ax3.text(dinter_dk / 2, -w_wall - 160, f"Dinding Kiri:\n{int(dinter_dk)} mm", ha='center', va='top', fontsize=10, color='blue', fontweight='bold')
         ax3.text(lebar_sh - (dinding_kanan/2), -w_wall - 140, f"Dinding Kanan:\n{int(dinding_kanan)} mm", ha='center', va='top', fontsize=10, color='blue', fontweight='bold')
-        ax3.text((dinding_kiri + lebar_sh - dinding_kanan)/2, -60, f"Lebar Pintu / Doorway: {width_doorway} mm", ha='center', va='center', fontsize=10, color='black', fontweight='bold')
+        ax3.text((dinter_dk + lebar_sh - dinding_kanan)/2, -60, f"Lebar Pintu / Doorway: {width_doorway} mm", ha='center', va='center', fontsize=10, color='black', fontweight='bold')
 
         plot_kiri = config_sep in ['KIRI', 'KANAN-KIRI', '3-SISI']
         plot_kanan = config_sep in ['KANAN', 'KANAN-KIRI', '3-SISI']
@@ -595,13 +596,14 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
             ax3.text(x_l2 - 45, dalam_sh / 2, f"Clear Depth  Shaft: {dalam_sh} mm", color='darkred', va='center', ha='right', fontweight='bold', fontsize=10)
             ax3.text(x_r2 + 45, dalam_sh / 2, f"Clear Depth:\n{dalam_sh} mm", color='darkred', va='center', ha='left', fontweight='bold', fontsize=10)
 
+
         y_w_line = dalam_sh + 320
         ax3.plot([0, lebar_sh], [y_w_line, y_w_line], 'r-', lw=1.2)
         ax3.plot([0, 0], [dalam_sh, y_w_line + 40], 'r-', lw=0.6)
         ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_w_line + 40], 'r-', lw=0.6)
         ax3.text(lebar_sh / 2, y_w_line + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
 
-        txt_title = "DENAH POTONGAN STRUKTUR KOLOM UTAMA (TAMPAK ATAS)"
+        txt_title = "HOISTWAY"
         draw_rigid_border(ax3, x_p3_min + 30, x_p3_max - 30, y_p3_min + 150, y_p3_max - 30, nama_project, no_kontrak, txt_title, 3, 3, zoom_logo=0.25)
         plt.tight_layout(); pdf.savefig(fig3, dpi=300); plt.close(fig3)
 
@@ -619,37 +621,38 @@ tab_balok, tab_kolom = st.tabs(["1. Opsi Balok Separator Beam", "2. Opsi Tiang K
 
 with tab_balok:
     st.header("Konfigurasi Gambar Kerja Balok Separator Samping")
-    # PERBAIKAN COLUMN TRACKING: Mengembalikan pembagian 3 kolom (col1, col2, col3) secara konsisten
+    # PERBAIKAN STRUKTURAL UTAMA: Mengaktifkan pembagian 3 kolom kaku untuk layout input parameter gawang
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.subheader("Parameter Proyek & Sipil")
-        b_nama_project = st.text_input("Nama Proyek / Klien:", value=st.session_state.b_nama_project, key="b_proj")
-        b_no_kontrak = st.text_input("Nomor Gambar Kerja:", value=st.session_state.b_no_kontrak, key="b_kontrak")
-        b_config_sep = st.selectbox("Pilihan Konfigurasi Separator Beam:", ['3-SISI', 'KANAN-KIRI', 'KIRI', 'KANAN', 'BELAKANG'], key="b_cfg")
+        # TUNING STATE: Memotong b_config_sep dari value agar auto-fill sinkron tanpa lag memori
+        b_nama_project = st.text_input("Nama Proyek / Klien:", value=st.session_state.b_nama_project, key="b_proj_widget")
+        b_no_kontrak = st.text_input("Nomor Gambar Kerja:", value=st.session_state.b_no_kontrak, key="b_kontrak_widget")
+        b_config_sep = st.selectbox("Pilihan Konfigurasi Separator Beam:", ['3-SISI', 'KANAN-KIRI', 'KIRI', 'KANAN', 'BELAKANG'], index=['3-SISI', 'KANAN-KIRI', 'KIRI', 'KANAN', 'BELAKANG'].index(st.session_state.b_config_sep))
 
     with col2:
         st.subheader("Dimensi Hoistway Bersih (mm)")
-        b_lebar_sh = st.number_input("Lebar Area Lift / Hoistway (mm):", value=st.session_state.b_lebar_sh, key="b_w")
-        b_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway (mm):", value=st.session_state.b_dalam_sh, key="b_d")
-        b_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=st.session_state.b_h_pit, key="b_pit")
-        b_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=st.session_state.b_h_headroom, key="b_hr")
+        b_lebar_sh = st.number_input("Lebar Area Lift / Hoistway (mm):", value=st.session_state.b_lebar_sh, key="b_w_widget")
+        b_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway (mm):", value=st.session_state.b_dalam_sh, key="b_d_widget")
+        b_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=st.session_state.b_h_pit, key="b_pit_widget")
+        b_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=st.session_state.b_h_headroom, key="b_hr_widget")
 
     with col3:
         st.subheader("Dimensi Gawang & Penempatan")
-        b_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=st.session_state.b_jml_lantai, key="b_floors")
+        b_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=st.session_state.b_jml_lantai, key="b_floors_widget")
         b_travel_list = []
         for i in range(1, b_jml_lantai):
-            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"b_t_{i}")
+            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"b_t_{i}_widget")
             b_travel_list.append(t_val)
             
-        b_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=st.session_state.b_lebar_p, key="b_pw")
-        b_width_doorway = st.number_input("Lebar Kongleong Opening Sipil (mm):", value=st.session_state.b_width_doorway, key="b_dw")
-        b_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=st.session_state.b_tinggi_p, key="b_ph")
-        b_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang (mm):", value=st.session_state.b_tinggi_gembosan, key="b_gh")
-        b_tebal_l = st.number_input("Tebal Balok Cor Gawang Pintu (mm):", value=st.session_state.b_tebal_l, key="b_lt")
-        b_dinding_kiri = st.number_input("Jarak Dinding Kiri ke Tepi Doorway (mm):", value=st.session_state.b_dinding_kiri, key="b_lwall")
-        b_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Balok):", ["KANAN", "KIRI"], horizontal=True, key="b_side_btn")
+        b_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=st.session_state.b_lebar_p, key="b_pw_widget")
+        b_width_doorway = st.number_input("Lebar Kongleong Opening Sipil (mm):", value=st.session_state.b_width_doorway, key="b_dw_widget")
+        b_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=st.session_state.b_tinggi_p, key="b_ph_widget")
+        b_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang (mm):", value=st.session_state.b_tinggi_gembosan, key="b_gh_widget")
+        b_tebal_l = st.number_input("Tebal Balok Cor Gawang Pintu (mm):", value=st.session_state.b_tebal_l, key="b_lt_widget")
+        b_dinding_kiri = st.number_input("Jarak Dinding Kiri ke Tepi Doorway (mm):", value=st.session_state.b_dinding_kiri, key="b_lwall_widget")
+        b_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Balok):", ["KANAN", "KIRI"], index=["KANAN", "KIRI"].index(st.session_state.b_side_tombol), horizontal=True, key="b_side_btn_widget")
 
     st.write("---")
     st.subheader("Preview Dokumen Cetak Biru Resmi")
@@ -684,40 +687,40 @@ with tab_kolom:
     
     with col_k1:
         st.subheader("Parameter Proyek & Sipil")
-        k_nama_project = st.text_input("Nama Proyek / Klien:", value=st.session_state.k_nama_project, key="k_proj")
-        k_no_kontrak = st.text_input("Nomor Gambar Kerja:", value=st.session_state.k_no_kontrak, key="k_kontrak")
-        k_posisi_cwt = st.radio("Posisi Penempatan CWT Mekanikal:", ["L (KANAN LAYOUT)", "K (KIRI LAYOUT)"], horizontal=True, key="k_cwt_pos")
+        k_nama_project = st.text_input("Nama Proyek / Klien:", value=st.session_state.k_nama_project, key="k_proj_widget")
+        k_no_kontrak = st.text_input("Nomor Gambar Kerja:", value=st.session_state.k_no_kontrak, key="k_kontrak_widget")
+        k_posisi_cwt = st.radio("Posisi Penempatan CWT Mekanikal:", ["L (KANAN LAYOUT)", "K (KIRI LAYOUT)"], index=["L (KANAN LAYOUT)", "K (KIRI LAYOUT)"].index(st.session_state.k_posisi_cwt), horizontal=True, key="k_cwt_pos_widget")
         cwt_char = k_posisi_cwt[0]
         
-        k_lebar_sh = st.number_input("Lebar Area Lift / Hoistway Luar Murni (mm):", value=st.session_state.k_lebar_sh, key="k_w")
-        k_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway Luar Murni (mm):", value=st.session_state.k_dalam_sh, key="k_d")
-        k_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=st.session_state.k_h_pit, key="k_pit")
-        k_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=st.session_state.k_h_headroom, key="k_hr")
+        k_lebar_sh = st.number_input("Lebar Area Lift / Hoistway Luar Murni (mm):", value=st.session_state.k_lebar_sh, key="k_w_widget")
+        k_dalam_sh = st.number_input("Kedalaman Area Lift / Hoistway Luar Murni (mm):", value=st.session_state.k_dalam_sh, key="k_d_widget")
+        k_h_pit = st.number_input("Kedalaman PIT Bersih (mm):", value=st.session_state.k_h_pit, key="k_pit_widget")
+        k_h_headroom = st.number_input("Tinggi Headroom / Overhead (mm):", value=st.session_state.k_h_headroom, key="k_hr_widget")
         
     with col_k2:
         st.subheader("Parameter Mekanikal Rel Kunci")
-        k_posisi_rel_kabin = st.number_input("Jarak AS REL Kabin ke bibir depan car / kabin (mm):", value=st.session_state.k_posisi_rel_kabin, key="k_rail_pos")
-        k_track_gauge_cwt = st.number_input("Jarak antar rel CWT / Secondary Track Gauge (mm):", value=st.session_state.k_track_gauge_cwt, key="k_stg")
-        k_tebal_rail_cwt = st.number_input("Ketebalan fisik profil rel CWT (mm):", value=st.session_state.k_tebal_rail_cwt, key="k_tr")
-        k_tebal_pintu_luar = st.number_input("Ketebalan mekanisme pintu luar (mm):", value=st.session_state.k_tebal_pintu_luar, key="k_out_door")
-        k_celah_daun_pintu = st.number_input("Celah bebas ruang gerak pintu / clearance (mm):", value=st.session_state.k_celah_daun_pintu, key="k_pclear")
-        k_tebal_kolom = st.number_input("Ketebalan/Dimensi Kolom Struktur Yang Diinginkan (mm):", value=st.session_state.k_tebal_kolom, key="k_tk")
+        k_posisi_rel_kabin = st.number_input("Jarak AS REL Kabin ke bibir depan car / kabin (mm):", value=st.session_state.k_posisi_rel_kabin, key="k_rail_pos_widget")
+        k_track_gauge_cwt = st.number_input("Jarak antar rel CWT / Secondary Track Gauge (mm):", value=st.session_state.k_track_gauge_cwt, key="k_stg_widget")
+        k_tebal_rail_cwt = st.number_input("Ketebalan fisik profil rel CWT (mm):", value=st.session_state.k_tebal_rail_cwt, key="k_tr_widget")
+        k_tebal_pintu_luar = st.number_input("Ketebalan mekanisme pintu luar (mm):", value=st.session_state.k_tebal_pintu_luar, key="k_out_door_widget")
+        k_celah_daun_pintu = st.number_input("Celah bebas ruang gerak pintu / clearance (mm):", value=st.session_state.k_celah_daun_pintu, key="k_pclear_widget")
+        k_tebal_kolom = st.number_input("Ketebalan/Dimensi Kolom Struktur Yang Diinginkan (mm):", value=st.session_state.k_tebal_kolom, key="k_tk_widget")
 
     with col_k3:
         st.subheader("Dimensi Gawang Opening Depan")
-        k_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=st.session_state.k_jml_lantai, key="k_floors")
+        k_jml_lantai = st.number_input("Jumlah Lantai (Stop):", min_value=2, max_value=10, value=st.session_state.k_jml_lantai, key="k_floors_widget")
         k_travel_list = []
         for i in range(1, k_jml_lantai):
-            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"k_t_{i}")
+            t_val = st.number_input(f"Tinggi Travel Lantai {i} ke {i+1} (mm):", value=3500, key=f"k_t_{i}_widget")
             k_travel_list.append(t_val)
             
-        k_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=st.session_state.k_lebar_p, key="k_pw_col")
-        k_width_doorway = st.number_input("Lebar Kongleong Sipil Opening (mm):", value=st.session_state.k_width_doorway, key="k_dw_col")
-        k_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=st.session_state.k_tinggi_p, key="k_ph_col")
-        k_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang Pintu (mm):", value=st.session_state.k_tinggi_gembosan, key="k_gh_col")
-        k_tebal_l = st.number_input("Tebal Balok Cor Lintel di atas pintu (mm):", value=st.session_state.k_tebal_l, key="k_lt_col")
-        k_dinding_kiri = st.number_input("Jarak asimetris dinding kiri KUPINGAN OPENING (mm):", value=st.session_state.k_dinding_kiri, key="k_lwall_col")
-        k_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Kolom):", ["KANAN", "KIRI"], horizontal=True, key="k_side_btn")
+        k_lebar_p = st.number_input("Lebar Opening Pintu Bersih (mm):", value=st.session_state.k_lebar_p, key="k_pw_col_widget")
+        k_width_doorway = st.number_input("Lebar Kongleong Sipil Opening (mm):", value=st.session_state.k_width_doorway, key="k_dw_col_widget")
+        k_tinggi_p = st.number_input("Tinggi Opening Pintu Bersih (mm):", value=st.session_state.k_tinggi_p, key="k_ph_col_widget")
+        k_tinggi_gembosan = st.number_input("Total Tinggi Gembosan Sipil Gawang Pintu (mm):", value=st.session_state.k_tinggi_gembosan, key="k_gh_col_widget")
+        k_tebal_l = st.number_input("Tebal Balok Cor Lintel di atas pintu (mm):", value=st.session_state.k_tebal_l, key="k_lt_col_widget")
+        k_dinding_kiri = st.number_input("Jarak asimetris dinding kiri KUPINGAN OPENING (mm):", value=st.session_state.k_dinding_kiri, key="k_lwall_col_widget")
+        k_side_tombol = st.radio("Penempatan Posisi Tombol Pintu (Kolom):", ["KANAN", "KIRI"], index=["KANAN", "KIRI"].index(st.session_state.k_side_tombol), horizontal=True, key="k_side_btn_widget")
 
     st.write("---")
     st.subheader("Preview Dokumen Cetak Biru Resmi")
