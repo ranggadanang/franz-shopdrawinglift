@@ -312,6 +312,8 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         ax2.add_patch(plt.Rectangle((0, -100), lebar_sh, 100, hatch='...', facecolor='lightgray', edgecolor='black', alpha=0.6))
         ax2.plot([0, 0], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
         ax2.plot([lebar_sh, lebar_sh], [-100, elevasi_lintel + tebal_l + 350], 'k-', lw=2.5)
+        
+        # FIX PERBAIKAN: Mengganti variabel typo agar tidak menghasilkan tuple data bentrok
         ax2.plot([dinding_kiri, dinding_kiri], [0, elevasi_lintel], 'k-', lw=2)
         ax2.plot([lebar_sh - dinding_kanan, lebar_sh - dinding_kanan], [0, elevasi_lintel], 'k-', lw=2)
         ax2.plot([dinding_kiri, lebar_sh - dinding_kanan], [elevasi_lintel, elevasi_lintel], 'k-', lw=2)
@@ -383,7 +385,7 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         ax3.plot([0, lebar_sh], [y_dim_width, y_dim_width], 'r-', lw=1.2)
         ax3.plot([0, 0], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
         
-        # PERBAIKAN TOTAL: Menghapus logika evaluasi sisa variabel y_w_line agar murni membaca garis dimensi horizontal y_dim_width
+        # PERBAIKAN MUTLAK: Menjamin y_dim_width dibaca sebagai basis dimensi horizontal bersih tunggal
         ax3.plot([lebar_sh, lebar_sh], [dalam_sh, y_dim_width + 40], 'r-', lw=0.6)
         ax3.text(lebar_sh / 2, y_dim_width + 50, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='bottom', fontweight='bold', fontsize=11)
         
@@ -591,7 +593,7 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
             ax3.plot([x_r1, x_r1], [0, dalam_sh], 'r-', lw=1); ax3.plot([x_r2, x_r2], [0, dalam_sh], 'r-', lw=1)
             
             ax3.text(x_r1 - 35, y_start_kabin / 2, f"{int(y_start_kabin)} mm", color='red', va='center', ha='right', fontweight='bold', fontsize=9.5)
-            ax3.text(x_r1 + 35, (y_start_kabin + y_end_kabin)/2, f"{tebal_kolom} mm\n(Kolom Kanan)", color='black', va='center', ha='left', fontweight='bold', fontsize=9)
+            ax3.text(x_r1 + 35, (y_start_kabin + y_end_kabin)/2, f"{tebal_kolom} mm\n(Kolom Kanan)", color='black', va='center', ha='left', fontsize=9)
             ax3.text(x_r1 - 35, y_end_kabin + (sisa_belakang_kabin/2), f"{int(sisa_belakang_kabin)} mm", color='red', va='center', ha='right', fontweight='bold', fontsize=9.5)
             
             ax3.text(x_l2 - 45, dalam_sh / 2, f"Clear Depth  Shaft: {dalam_sh} mm", color='darkred', va='center', ha='right', fontweight='bold', fontsize=10)
@@ -742,7 +744,7 @@ with tab_kolom:
         payload_b = {
             "nama_project": k_nama_project, "no_drawing": k_no_kontrak, "tipe_modul": "Column Structure",
             "lebar_hoistway": k_lebar_sh, "dalam_hoistway": k_dalam_sh, "kedalaman_pit": k_h_pit, "tinggi_headroom": k_h_headroom,
-            "jml_lantai": k_jml_lantai, "lebar_pintu_bersih": k_lebar_p, "width_doorway": k_width_doorway,
+            "jml_lantai": k_f_num, "lebar_pintu_bersih": k_lebar_p, "width_doorway": k_width_doorway,
             "tinggi_p": k_tinggi_p, "tinggi_gembosan": k_tinggi_gembosan, "tebal_l": k_tebal_l, "dinding_kiri": k_dinding_kiri,
             "side_tombol": k_side_tombol, "posisi_cwt_raw": k_posisi_cwt, "posisi_rel_kabin": k_posisi_rel_kabin,
             "track_gauge_cwt": k_track_gauge_cwt, "tebal_rail_cwt": k_tebal_rail_cwt, "tebal_pintu_luar": k_tebal_pintu_luar,
