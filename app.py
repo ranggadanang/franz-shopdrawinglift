@@ -202,7 +202,7 @@ def draw_rigid_border(ax, x_min, x_max, y_min, y_max, project_name, contract_no,
     ax.text(x_c1 + 20, y_kop_start + (h_kop * 0.30), f"CONTRACT NO: {contract_no}", color='dimgray', va='center', ha='left', fontsize=9, zorder=103)
     
     ax.text(x_c2 + 20, y_kop_start + (h_kop * 0.68), "DRAWING TITLE :", color='dimgray', va='center', ha='left', fontsize=8, zorder=103)
-    ax.text(x_c2 + 20, y_kop_start + (h_kop * 0.32), page_title, color='black', fontweight='bold', va='center', ha='left', fontsize=8.5, zorder=103)
+    ax.text(x_c2 + 20, y_kop_start + (h_kop * 0.32), page_title, color='black', fontweight='bold', va='center', ha='left', fontsize=8, zorder=103)
     
     ax.text(x_c3 + 20, y_kop_start + (h_kop * 0.65), "DESIGNED BY: RDP", color='black', va='center', ha='left', fontsize=8, zorder=103)
     ax.text(x_c3 + 20, y_kop_start + (h_kop * 0.30), f"PAGE : {page_num} OF {total_pages}", color='blue', fontweight='bold', va='center', ha='left', fontsize=9.5, zorder=103)
@@ -231,23 +231,29 @@ def draw_door_elevation_panel(ax, x_offset, span_dim, d_kiri, w_doorway, l_bersi
     ax.text(x_offset + span_dim / 2, elev_lintel + (t_lintel / 2), "Balok Lintel Beton Cor", color='white', ha='center', va='center', fontweight='bold', fontsize=9.5)
     ax.text(x_offset + (d_kiri + span_dim - d_kanan)/2, t_pintu/2, f"Opening Pintu Sipil (Doorway)\n{w_doorway} x {elev_lintel} mm\n(Bukaan Bersih: {l_bersih} mm)", color='black', va='center', ha='center', fontsize=10, fontweight='bold')
     
-    # Lubang Kabel Tombol Ø25mm
+    # Lubang Kabel Tombol Ø25mm (Anotasi lurus vertikal ke bawah agar tidak menabrak garis dinding)
     if side_btn == "KANAN":
         x_hole = x_offset + (span_dim - d_kanan) + (d_kanan / 2)
-        xy_text_pos = (x_hole + 220, 1000); rad_val = -0.15
     else:
         x_hole = x_offset + (d_kiri / 2)
-        xy_text_pos = (x_hole - 220, 1000); rad_val = 0.15
         
     ax.plot([x_hole - 45, x_hole + 45], [1200, 1200], 'r-', lw=1)
     ax.plot(x_hole, 1200, 'ko', markersize=9, fillstyle='none', lw=1.5)
-    ax.annotate("Lubang Kabel\nTombol Ø25mm\n(As Tombol)", xy=(x_hole, 1190), xytext=xy_text_pos,
-                arrowprops=dict(arrowstyle="->", color="black", lw=1.2, connectionstyle=f"arc3,rad={rad_val}"),
+    ax.annotate("Lubang Kabel\nTombol Ø25mm\n(As Tombol)", xy=(x_hole, 1185), xytext=(x_hole, 950),
+                arrowprops=dict(arrowstyle="->", color="black", lw=1.2),
                 fontsize=8.5, color='black', fontweight='bold', ha='center', va='top')
 
-    # Label Kupingan Dinding Kiri & Kanan (Perspektif Luar Hoistway)
-    ax.text(x_offset + d_kiri / 2, 150, f"Dinding Kiri:\n{int(d_kiri)} mm", ha='center', va='bottom', fontsize=9, color='blue', fontweight='bold')
-    ax.text(x_offset + span_dim - (d_kanan/2), 150, f"Dinding Kanan:\n{int(d_kanan)} mm", ha='center', va='bottom', fontsize=9, color='blue', fontweight='bold')
+    # Label Kupingan Dinding Kiri (Otomatis rotasi vertikal jika dinding sempit < 180mm)
+    if d_kiri < 180:
+        ax.text(x_offset + d_kiri / 2, 220, f"Dinding Kiri: {int(d_kiri)} mm", rotation=90, ha='center', va='bottom', fontsize=8.5, color='blue', fontweight='bold')
+    else:
+        ax.text(x_offset + d_kiri / 2, 150, f"Dinding Kiri:\n{int(d_kiri)} mm", ha='center', va='bottom', fontsize=9, color='blue', fontweight='bold')
+
+    # Label Kupingan Dinding Kanan (Otomatis rotasi vertikal jika dinding sempit < 180mm)
+    if d_kanan < 180:
+        ax.text(x_offset + span_dim - (d_kanan/2), 220, f"Dinding Kanan: {int(d_kanan)} mm", rotation=90, ha='center', va='bottom', fontsize=8.5, color='blue', fontweight='bold')
+    else:
+        ax.text(x_offset + span_dim - (d_kanan/2), 150, f"Dinding Kanan:\n{int(d_kanan)} mm", ha='center', va='bottom', fontsize=9, color='blue', fontweight='bold')
 
     # Garis Dimensi Vertikal (Elevasi Lintel & Tebal Lintel)
     x_dim_baseline = x_offset + span_dim + 120 
@@ -281,7 +287,6 @@ def draw_plan_doorway(ax, wall_side, span_w, span_d, w_wall, d_kiri_luar, w_door
         ax.text((x_start + x_end)/2, -65, f"{label_door}: {w_doorway} mm", ha='center', va='center', fontsize=9.5, color='black', fontweight='bold', zorder=7)
         
     elif wall_side == "BELAKANG":
-        # Dilihat dari luar sisi belakang menghadap ke dalam: Kiri ada di sisi X=span_w, Kanan ada di sisi X=0
         d_kanan_luar = span_w - (d_kiri_luar + w_doorway)
         x_end = span_w - d_kiri_luar
         x_start = x_end - w_doorway
@@ -293,7 +298,6 @@ def draw_plan_doorway(ax, wall_side, span_w, span_d, w_wall, d_kiri_luar, w_door
         ax.text((x_start + x_end)/2, span_d + 65, f"{label_door}: {w_doorway} mm", ha='center', va='center', fontsize=9.5, color='black', fontweight='bold', zorder=7)
 
     elif wall_side == "KANAN":
-        # Dilihat dari luar sisi kanan menghadap ke dalam: Kiri ada di sisi Y=0 (Depan), Kanan ada di sisi Y=span_d (Belakang)
         d_kanan_luar = span_d - (d_kiri_luar + w_doorway)
         y_start = d_kiri_luar
         y_end = d_kiri_luar + w_doorway
@@ -305,7 +309,6 @@ def draw_plan_doorway(ax, wall_side, span_w, span_d, w_wall, d_kiri_luar, w_door
         ax.text(span_w + 75, (y_start + y_end)/2, f"{label_door}:\n{w_doorway} mm", rotation=270, ha='center', va='center', fontsize=9, color='black', fontweight='bold', zorder=7)
 
     elif wall_side == "KIRI":
-        # Dilihat dari luar sisi kiri menghadap ke dalam: Kiri ada di sisi Y=span_d (Belakang), Kanan ada di sisi Y=0 (Depan)
         d_kanan_luar = span_d - (d_kiri_luar + w_doorway)
         y_end = span_d - d_kiri_luar
         y_start = y_end - w_doorway
@@ -399,7 +402,7 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
     is_two_doors = door_config != "1 Sisi (Depan)"
     
     with PdfPages(buffer) as pdf:
-        # HALAMAN 1 (TIDAK BERUBAH)
+        # HALAMAN 1
         fig1, ax1 = plt.subplots(figsize=(10, 22))
         x_min, x_max = -1200, lebar_sh + 2300
         y_min, y_max = -600, total_height + 400
@@ -437,7 +440,7 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
                 ax1.text(x_right_dim + 130, mid_y, f"{int(el['height'])}", color='dimgray', va='center', ha='left', fontsize=9.5)
 
         ax1.plot([col1_x, col1_x + lebar_sh], [-180, -180], 'r-', lw=1.5)
-        ax1.text(col1_x + (lebar_sh/2), -220, "Sepanjang Shaft", color='red', ha='center', va='top', fontweight='bold', fontsize=11)
+        ax1.text(col1_x + (lebar_sh/2), -220, f"Clear Width of Shaft: {lebar_sh} mm", color='red', ha='center', va='top', fontweight='bold', fontsize=11)
         
         draw_rigid_border(ax1, x_min + 50, x_max - 50, y_min + 50, y_max - 50, nama_project, no_kontrak, "SEPARATOR BEAM", 1, 3, zoom_logo=0.15)
         plt.tight_layout(); pdf.savefig(fig1, dpi=300); plt.close(fig1)
@@ -475,7 +478,8 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
                 ax2, lebar_sh + gap_between, span_door2, dinding_awal2, width_doorway2, lebar_p2,
                 elevasi_lintel, tebal_l, tinggi_p, side_tombol2, f"PINTU 2 ({sisi_p2_nama})"
             )
-            draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 30, y_p2_max - 30, nama_project, no_kontrak, f"OPENING PINTU ({door_config.upper()})", 2, 3, zoom_logo=0.25)
+            short_door_title = "OPENING PINTU (2 SISI BERSEBERANGAN)" if "Berseberangan" in door_config else "OPENING PINTU (2 SISI ADJACENT)"
+            draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 30, y_p2_max - 30, nama_project, no_kontrak, short_door_title, 2, 3, zoom_logo=0.25)
             plt.tight_layout(); pdf.savefig(fig2, dpi=300); plt.close(fig2)
 
         # HALAMAN 3 (DENAH HOISTWAY & BALOK SEPARATOR)
@@ -499,23 +503,18 @@ def make_balok_pdf(elements, lebar_sh, dalam_sh, total_height, travel_list, floo
         elif door_config == "2 Sisi Adjacent (Depan & Kiri)":
             draw_plan_doorway(ax3, "KIRI", lebar_sh, dalam_sh, w_wall, dinding_awal2, width_doorway2, "Pintu 2 (Kiri)")
 
-        # Aturan Penempatan Balok Separator sesuai Konfigurasi Pintu
+        # Aturan Penempatan Balok Separator sesuai Pilihan User & Konfigurasi Pintu
+        plot_kiri = config_sep in ['KIRI', 'KANAN-KIRI', '3-SISI']
+        plot_kanan = config_sep in ['KANAN', 'KANAN-KIRI', '3-SISI']
+        plot_belakang = config_sep in ['BELAKANG', '3-SISI']
+
+        # Blokir sisi dinding yang memiliki pintu agar separator tidak menabrak bukaan pintu
         if door_config == "2 Sisi Adjacent (Depan & Kanan)":
-            plot_kiri = True
             plot_kanan = False
-            plot_belakang = config_sep in ['BELAKANG', '3-SISI']
         elif door_config == "2 Sisi Adjacent (Depan & Kiri)":
             plot_kiri = False
-            plot_kanan = True
-            plot_belakang = config_sep in ['BELAKANG', '3-SISI']
         elif door_config == "2 Sisi Berseberangan (Depan & Belakang)":
-            plot_kiri = config_sep in ['KIRI', 'KANAN-KIRI', '3-SISI']
-            plot_kanan = config_sep in ['KANAN', 'KANAN-KIRI', '3-SISI']
             plot_belakang = False
-        else:
-            plot_kiri = config_sep in ['KIRI', 'KANAN-KIRI', '3-SISI']
-            plot_kanan = config_sep in ['KANAN', 'KANAN-KIRI', '3-SISI']
-            plot_belakang = config_sep in ['BELAKANG', '3-SISI']
             
         if plot_kiri:
             ax3.add_patch(plt.Rectangle((-w_sep, 0), w_sep, dalam_sh, facecolor='black', edgecolor='black', alpha=0.8))
@@ -601,7 +600,7 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
     total_height = floor_y_positions[-1] + h_headroom
 
     with PdfPages(buffer) as pdf:
-        # HALAMAN 1 (TIDAK BERUBAH)
+        # HALAMAN 1
         fig1, ax1 = plt.subplots(figsize=(14, 22))
         x_min, x_max = -400, (dalam_sh * 2) + 800
         y_min, y_max = -600, total_height + 400
@@ -682,7 +681,8 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
                 ax2, lebar_sh + gap_between, span_door2, dinding_awal2, width_doorway2, lebar_p2,
                 elevasi_lintel, tebal_l, tinggi_p, side_tombol2, f"PINTU 2 ({sisi_p2_nama})"
             )
-            draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 30, y_p2_max - 30, nama_project, no_kontrak, f"OPENING PINTU ({door_config.upper()})", 2, 3, zoom_logo=0.25)
+            short_door_title = "OPENING PINTU (2 SISI BERSEBERANGAN)" if "Berseberangan" in door_config else "OPENING PINTU (2 SISI ADJACENT)"
+            draw_rigid_border(ax2, x_p2_min + 30, x_p2_max - 30, y_p2_min + 30, y_p2_max - 30, nama_project, no_kontrak, short_door_title, 2, 3, zoom_logo=0.25)
             plt.tight_layout(); pdf.savefig(fig2, dpi=300); plt.close(fig2)
 
         # HALAMAN 3 (DENAH POTONGAN STRUKTUR KOLOM UTAMA - TAMPAK ATAS)
@@ -695,10 +695,10 @@ def make_kolom_pdf(lebar_sh, dalam_sh, h_pit_bersih, h_headroom, travel_list, po
         ax3.add_patch(plt.Rectangle((-w_wall, -w_wall), lebar_sh + (2*w_wall), dalam_sh + (2*w_wall), facecolor='none', edgecolor='black', lw=2.5))
         ax3.add_patch(plt.Rectangle((0, 0), lebar_sh, dalam_sh, facecolor='whitesmoke', edgecolor='black', lw=1.5))
         
-        # Lubang Pintu 1 (Depan) - Sudut pandang dari luar hoistway
+        # Lubang Pintu 1 (Depan)
         draw_plan_doorway(ax3, "DEPAN", lebar_sh, dalam_sh, w_wall, dinding_kiri, width_doorway, "Doorway 1")
         
-        # Lubang Pintu 2 - Sudut pandang dari luar hoistway menghadap masing-masing pintu
+        # Lubang Pintu 2
         if door_config == "2 Sisi Berseberangan (Depan & Belakang)":
             draw_plan_doorway(ax3, "BELAKANG", lebar_sh, dalam_sh, w_wall, dinding_awal2, width_doorway2, "Doorway 2")
         elif door_config == "2 Sisi Adjacent (Depan & Kanan)":
@@ -851,8 +851,8 @@ with tab_balok:
         b_no_kontrak = st.text_input("Nomor Gambar Kerja:", value=st.session_state.b_no_kontrak)
         b_door_config = st.selectbox("Konfigurasi Sisi Pintu Lift:", DOOR_CONFIG_OPTIONS, index=DOOR_CONFIG_OPTIONS.index(st.session_state.b_door_config), key="b_door_cfg_sel")
         
-        if "Adjacent" in b_door_config:
-            st.info("ℹ️ Pintu 2-sisi Adjacent aktif: Balok separator samping otomatis hanya dipasang pada 1 sisi dinding yang tertutup.")
+        if b_door_config != "1 Sisi (Depan)":
+            st.info("ℹ️ Sisi dinding yang memiliki pintu otomatis dibebaskan dari balok separator.")
         b_config_sep = st.selectbox("Pilihan Konfigurasi Separator Beam:", ['3-SISI', 'KANAN-KIRI', 'KIRI', 'KANAN', 'BELAKANG'], index=['3-SISI', 'KANAN-KIRI', 'KIRI', 'KANAN', 'BELAKANG'].index(st.session_state.b_config_sep))
 
         st.markdown("---")
